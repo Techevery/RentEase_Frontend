@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../redux/store';
 import { logout as logoutAction } from '../../redux/slices/authSlice';
 import {
-  Menu, X, ChevronDown, Bell, Settings, LogOut, 
+  Menu, X, ChevronDown, Settings, LogOut, 
   Home, Users, Building, CreditCard, BarChart2,
 } from 'lucide-react';
 
@@ -16,7 +16,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
 
 
 
@@ -86,18 +86,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           </button>
 
           <div className="flex items-center space-x-4">
-            <div className="relative">
-              <button onClick={() => setNotificationsOpen(!notificationsOpen)} className="p-1 text-gray-500 rounded-md hover:bg-gray-100 relative">
-                <Bell size={22} />
-              
-              </button>
-
-             
-            </div>
+            
 
             <div className="relative">
               <button onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none">
-                {/* <img src={user?.avatar || 'https://i.pravatar.cc/150?img=1'} alt="Profile" className="w-8 h-8 rounded-full object-cover" /> */}
                 <span className="hidden md:block text-sm font-medium">{user?.name}</span>
                 <ChevronDown size={16} />
               </button>
@@ -105,7 +97,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               {profileDropdownOpen && (
                 <div className="absolute right-[-6] mt-2 w-48 bg-white rounded-md shadow-lg z-50">
                   <div className="py-1">
-                    <div className="px-4 py-2 border-b border-gray-100">
+                    <div className="px- py-2 border-b border-gray-100">
                       <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>

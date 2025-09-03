@@ -52,7 +52,7 @@ const PaymentHistoryModal: React.FC<PaymentHistoryModalProps> = ({
                 </div>
                 <div>
                   <span className="text-gray-600">Total Amount:</span>
-                  <span className="font-medium ml-2">₦{summary.totalAmount.toLocaleString()}</span>
+                  <span className="font-medium ml-2">₦{summary.approved.amount.toLocaleString()}</span>
                 </div>
                 <div>
                   <span className="text-gray-600">Approved:</span>

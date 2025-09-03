@@ -292,7 +292,7 @@ const TenantProfileModal: React.FC<{
                     </div>
                     <div className="text-center p-3 bg-white rounded shadow-sm">
                       <div className="text-2xl font-bold text-green-600">
-                        {formatCurrency(paymentSummary.data.summary.totalAmount)}
+                        {formatCurrency(paymentSummary.data.summary.approved.amount)}
                       </div>
                       <div className="text-sm text-gray-600">Total Amount</div>
                     </div>

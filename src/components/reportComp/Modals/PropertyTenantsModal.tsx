@@ -61,7 +61,7 @@ const PropertyTenantsModal: React.FC<PropertyTenantsModalProps> = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
+                {/* <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th> */}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lease Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
@@ -78,9 +78,9 @@ const PropertyTenantsModal: React.FC<PropertyTenantsModalProps> = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {unit.tenant.phone}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     Flat {unit.flatNumber} (Floor {unit.floorNumber})
-                  </td>
+                  </td> */}
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs rounded-full ${
                       new Date(unit.tenant.leaseEnd) > new Date()

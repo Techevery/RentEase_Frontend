@@ -268,11 +268,11 @@ const TenantDetailsModal: React.FC<TenantModalProps> = ({ open, onClose, tenantD
               }}
             >
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{summary.totalPayments}</Typography><Typography variant="body2">Total Payments</Typography></Paper>
-              <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.totalAmount)}</Typography><Typography variant="body2">Total Amount</Typography></Paper>
+              <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.approved.amount)}</Typography><Typography variant="body2">Total Amount</Typography></Paper>
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="success.main">{summary.approved.count}</Typography><Typography variant="body2">Approved</Typography></Paper>
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="warning.main">{summary.pending.count}</Typography><Typography variant="body2">Pending</Typography></Paper>
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="error.main">{summary.rejected.count}</Typography><Typography variant="body2">Rejected</Typography></Paper>
-              <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.averagePayment)}</Typography><Typography variant="body2">Average Payment</Typography></Paper>
+              {/* <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.averagePayment)}</Typography><Typography variant="body2">Average Payment</Typography></Paper> */}
             </Box>
           ) : <Typography>No summary data available.</Typography>}
         </TabPanel>
