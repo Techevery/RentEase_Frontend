@@ -54,9 +54,7 @@ const Signup: React.FC = () => {
 
    if (!formData.phonenumber.trim()) {
   newErrors.phonenumber = 'Phone number is required';
-} else if (!/^\+?[1-9]\d{1,14}$/.test(formData.phonenumber)) {
-  newErrors.phonenumber = 'Please enter a valid international phone number';
-}
+} 
 
     if (!formData.password) {
       newErrors.password = 'Password is required';
@@ -100,11 +98,9 @@ if (isNaN(phoneNumber)) {
       const apiError = error as ApiError;
       console.error('Signup error:', apiError);
       const errorMessage = apiError.data?.message || 'Signup failed';
-
-      // Check for specific error messages
       if (errorMessage.includes('email')) {
         toast.error('Email already exists');
-      } else if (errorMessage.includes('phone')) {
+      } else if (errorMessage.includes('phonenumber')) {
         toast.error('Phone number already exists');
       } else {
         toast.error(errorMessage);
