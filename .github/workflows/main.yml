@@ -73,7 +73,7 @@ jobs:
             node -v
             npm -v
             git config --global credential.helper store
-            echo "https://${{ secrets.GITHUB_USERNAME }}:${{ secrets.GITHUB_PAT }}@github.com" > ~/.git-credentials
+            echo "https://${{ secrets.GIT_USERNAME }}:${{ secrets.GIT_PAT }}@github.com" > ~/.git-credentials
             chmod 600 ~/.git-credentials
             cd /var/www/html/app/rentease/frontend || { echo "Failed to cd to /var/www/html/app/rentease/frontend"; exit 1; }
             echo "Current directory: $(pwd)"
