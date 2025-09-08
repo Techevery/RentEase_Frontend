@@ -27,7 +27,7 @@ const payments: Payment[] = data.recentActivity?.payments ?? [];
 const expenses: Expense[] = data.recentActivity?.expenses ?? [];
 
   // Property counts
-  const totalProperties = (data.propertyCounts?.houses ?? 0) + (data.propertyCounts?.flats ?? 0);
+  const totalProperties = (data.propertyCounts?.houses ?? 0);
   const totalUnits = data.propertyCounts?.flats ?? 0;
   const totalTenants = data.propertyCounts?.tenants ?? 0;
   const totalManagers = data.propertyCounts?.managers ?? 0;
