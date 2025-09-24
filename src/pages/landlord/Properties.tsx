@@ -169,11 +169,13 @@ const Properties: React.FC = () => {
   };
 
   // Fixed FormData handling for properties
-  const handleFormSubmit = async (data: PropertyFormData) => {
+const handleFormSubmit = async (data: PropertyFormData) => {
   try {
     const formData = new FormData();
     
-    // Append all simple fields
+    console.log('Submitting property data:', data); // Debug log
+    
+    // Append all simple fields - FIXED: Ensure all fields are included
     const simpleFields = [
       'name', 'address', 'description', 'propertyType', 
       'totalFlats', 'parkingSpaces', 'maintenanceContact', 
@@ -183,52 +185,70 @@ const Properties: React.FC = () => {
     simpleFields.forEach(field => {
       const value = data[field as keyof PropertyFormData];
       if (value !== undefined && value !== null) {
-        formData.append(field, value.toString());
+        // Handle different data types properly
+        if (typeof value === 'boolean') {
+          formData.append(field, value.toString());
+        } else if (Array.isArray(value)) {
+          // For arrays, join with commas
+          formData.append(field, value.join(','));
+        } else {
+          formData.append(field, value.toString());
+        }
+      } else {
+        // Explicitly set empty values for update
+        formData.append(field, '');
       }
     });
 
-    // Handle arrays properly
-    if (Array.isArray(data.amenities)) {
-      data.amenities.forEach((amenity, index) => {
-        formData.append(`amenities[${index}]`, amenity);
-      });
+    // Handle amenities array - FIXED
+    if (Array.isArray(data.amenities) && data.amenities.length > 0) {
+      formData.append('amenities', data.amenities.join(','));
+    } else {
+      formData.append('amenities', ''); // Explicitly set empty
     }
 
-    if (Array.isArray(data.commonAreas)) {
-      data.commonAreas.forEach((area, index) => {
-        formData.append(`commonAreas[${index}]`, area);
-      });
+    // Handle commonAreas array - FIXED
+    if (Array.isArray(data.commonAreas) && data.commonAreas.length > 0) {
+      formData.append('commonAreas', data.commonAreas.join(','));
+    } else {
+      formData.append('commonAreas', ''); // Explicitly set empty
     }
 
-    // Handle nested objects
-    if (data.location) {
-      formData.append('location', JSON.stringify(data.location));
-    }
-
-    if (data.features) {
-      formData.append('features', JSON.stringify(data.features));
-    }
-
-    // Handle images - separate existing from new
+    // Handle images - FIXED: Better separation and handling
     const existingImages = data.images.filter(img => 
       typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
     );
     const newImages = data.images.filter(img => img instanceof File);
 
-    // Append existing images as JSON array
+    console.log('Images - Existing:', existingImages.length, 'New:', newImages.length); // Debug log
+
+    // Append existing images as JSON array - FIXED
     if (existingImages.length > 0) {
       formData.append('existingImages', JSON.stringify(existingImages));
+    } else {
+      // Explicitly clear images if empty during update
+      if (editing) {
+        formData.append('existingImages', '[]');
+      }
     }
 
     // Append new images as files
-    newImages.forEach((image) => {
+    newImages.forEach((image, index) => {
       formData.append('images', image);
     });
 
+    // Debug: Log what's being sent
+    console.log('FormData contents:');
+    for (let [key, value] of formData.entries()) {
+      console.log(key, value);
+    }
+
     if (editing) {
+      console.log('Updating property:', editing.id); // Debug log
       await updateHouse({ id: editing.id, formData }).unwrap();
       showSuccess('Property updated successfully');
     } else {
+      console.log('Creating new property'); // Debug log
       await createHouse(formData).unwrap();
       showSuccess('Property created successfully');
     }
@@ -243,66 +263,77 @@ const Properties: React.FC = () => {
     showError(apiError.response?.data?.message || 'Failed to save property');
   }
 };
-
-  // Fixed unit form submission
-  const handleUnitFormSubmit = async (data: UnitFormData) => {
+const handleUnitFormSubmit = async (data: UnitFormData) => {
   if (!selectedProperty) return;
   
   try {
     const formData = new FormData();
     
-    // Append all simple fields
+    console.log('Submitting unit data:', data); 
+    
+ 
+    formData.append('houseId', selectedProperty.id);
+    
+   
     const simpleFields = [
       'name', 'number', 'description', 'floorNumber', 'size', 
       'bedrooms', 'palour', 'toilet', 'kitchen', 'bathrooms', 
       'furnished', 'rentAmount', 'depositAmount', 'rentDueDay', 
-      'tenantId', 'status', 'houseId'
+      'tenantId', 'status'
     ];
 
     simpleFields.forEach(field => {
       const value = data[field as keyof UnitFormData];
       if (value !== undefined && value !== null) {
-        // Convert boolean to string
+    
         if (typeof value === 'boolean') {
-          formData.append(field, value.toString());
+          formData.append(field, value ? 'true' : 'false');
+        } else if (Array.isArray(value)) {
+         
+          formData.append(field, value.join(','));
         } else {
           formData.append(field, value.toString());
         }
+      } else {
+     
+        formData.append(field, '');
       }
     });
 
-    // Handle arrays properly
-    if (Array.isArray(data.utilities)) {
-      data.utilities.forEach((utility, index) => {
-        formData.append(`utilities[${index}]`, utility);
-      });
-    }
 
-    // Handle nested features
-    if (data.features) {
-      formData.append('features', JSON.stringify(data.features));
-    }
-
-    // Handle images - separate existing from new
     const existingImages = data.images.filter(img => 
       typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
     );
     const newImages = data.images.filter(img => img instanceof File);
 
-    // Append existing images as JSON array
+    console.log('Unit Images - Existing:', existingImages.length, 'New:', newImages.length); // Debug log
+
     if (existingImages.length > 0) {
       formData.append('existingImages', JSON.stringify(existingImages));
+    } else {
+     
+      if (editingUnit) {
+        formData.append('existingImages', '[]');
+      }
     }
 
     // Append new images as files
-    newImages.forEach((image) => {
+    newImages.forEach((image, index) => {
       formData.append('images', image);
     });
 
+    // Debug: Log what's being sent
+    console.log('Unit FormData contents:');
+    for (let [key, value] of formData.entries()) {
+      console.log(key, value);
+    }
+
     if (editingUnit) {
+      console.log('Updating unit:', editingUnit.id); 
       await updateUnit({ id: editingUnit.id, formData }).unwrap();
       showSuccess('Unit updated successfully');
     } else {
+      console.log('Creating new unit'); // Debug log
       await createUnit({ houseId: selectedProperty.id, formData }).unwrap();
       showSuccess('Unit created successfully');
     }

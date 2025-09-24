@@ -46,18 +46,21 @@ export const authApi = createApi({
       query: () => 'me',
     }),
 
-    // ✅ Update password mutation
+    // ✅ FIXED: Update password mutation with correct field names
     updatePassword: builder.mutation<
       any,
-      { userId?: string;    
-    oldPassword?: string;  
-    newPassword: string;
-    confirmPassword: string; }
+      { 
+        currentPassword: string;
+        newPassword: string;
+      }
     >({
       query: (data) => ({
         url: 'updatepassword',
         method: 'PUT',
-        body: data,
+        body: {
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword
+        },
       }),
     }),
 

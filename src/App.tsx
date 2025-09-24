@@ -41,6 +41,7 @@ function App() {
             
               {/* Auth Routes */}
               <Route path="/login" element={<Login />} />
+
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/signup" element={<Signup />} />
@@ -70,6 +71,7 @@ function App() {
         
               {/* Default Route */}
               <Route path="/" element={<Navigate to="/login"/>} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/settings" element={<Settings />} />
 
               
