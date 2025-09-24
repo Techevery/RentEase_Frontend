@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {Image as ImageIcon, X as XIcon } from 'lucide-react';
 import { PropertyFormData, House } from '../../../components/properties/types/property';
 import Button from '../../ui/Button';
@@ -8,7 +8,7 @@ import { toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 interface PropertyFormProps {
-  initial?: Partial<House>;
+  initial?: Partial<House> | "";
   onSubmit: (data: PropertyFormData) => Promise<void>;
   onClose: () => void;
   loading?: boolean;
@@ -65,18 +65,21 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
   onClose,
   loading = false,
 }) => {
+  // Handle the case where initial might be an empty string
+  const initialData = initial === "" ? {} : initial;
+
   const [form, setForm] = useState<PropertyFormData>({
-    name: initial.name || '',
-    address: initial.address || '',
-    description: initial.description || '',
-    propertyType: initial.propertyType || 'residential',
-    totalFlats: initial?.totalFlats || 1,
-    amenities: initial.amenities || [],
-    parkingSpaces: initial?.parkingSpaces || 0,
-    commonAreas: initial.commonAreas || [],
-    maintenanceContact:  initial.maintenanceContact  || '',
-    emergencyContact: initial.emergencyContact || '',
-    features: initial.features || {
+    name: initialData.name || '',
+    address: initialData.address || '',
+    description: initialData.description || '',
+    propertyType: initialData.propertyType || 'residential',
+    totalFlats: initialData.totalFlats || 1,
+    amenities: initialData.amenities || [],
+    parkingSpaces: initialData.parkingSpaces || 0,
+    commonAreas: initialData.commonAreas || [],
+    maintenanceContact: initialData.maintenanceContact || '',
+    emergencyContact: initialData.emergencyContact || '',
+    features: initialData.features || {
       hasElevator: false,
       hasGenerator: false,
       hasSecurity: false,
@@ -90,15 +93,16 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
       hasWifi: false,
       amenities: [],
     },
-    location: initial.location || {
+    location: initialData.location || {
       address: '',
       city: '',
       state: '',
       country: 'Nigeria',
       postalCode: '',
     },
-    images: initial.images || [],
-    managerId: initial.managerId?.toString() || '',
+    images: initialData.images || [],
+    managerId: initialData.managerId?.toString() || '',
+    status: initialData.status || 'active',
   });
 
   const [newAmenity, setNewAmenity] = useState('');
@@ -107,14 +111,36 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
   const { data: managerData, isLoading: managersLoading } = useGetManagersQuery();
   const managers = managerData?.data || [];
 
-  const [imagePreviews, setImagePreviews] = useState<string[]>(
-    (Array.isArray(initial.images)
-      ? initial.images.map((img: string | { url?: string }) =>
-          typeof img === 'string' ? img : img?.url || ''
-        ).filter(Boolean)
+  // Fix image state management
+  const [existingImages, setExistingImages] = useState<any[]>(
+    Array.isArray(initialData.images) 
+      ? initialData.images.filter(img => img && (typeof img === 'string' || (typeof img === 'object' && img.url)))
       : []
-  ));
+  );
+  
+  const [newImages, setNewImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load image previews on component mount
+  useEffect(() => {
+    const loadImagePreviews = () => {
+      const previews: string[] = [];
+      
+      // Add existing image URLs
+      existingImages.forEach(img => {
+        if (typeof img === 'string') {
+          previews.push(img);
+        } else if (img && typeof img === 'object' && img.url) {
+          previews.push(img.url);
+        }
+      });
+      
+      setImagePreviews(previews);
+    };
+
+    loadImagePreviews();
+  }, [existingImages]);
 
   const handleNumberChange = (name: string, value: number) => {
     setForm(prev => ({
@@ -127,26 +153,16 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    const { name, value , type } = e.target;
+    const { name, value, type } = e.target;
     setFormErrors(prev => ({ ...prev, [name]: '' }));
 
-     if (name === 'totalFlats' || name === 'parkingSpaces') {
-    const numValue = parseInt(value) || 0;
-    setForm(prev => ({
-      ...prev,
-      [name]: Math.max(name === 'totalFlats' ? 1 : 0, numValue)
-    }));
-  } else {
-    // Handle other fields normally
-    setForm(prev => ({
-      ...prev,
-      [name]: type === 'number' ? Number(value) : value
-    }));
-  }
-
-
-
-    if (name.startsWith('features.')) {
+    if (name === 'totalFlats' || name === 'parkingSpaces') {
+      const numValue = parseInt(value) || 0;
+      setForm(prev => ({
+        ...prev,
+        [name]: Math.max(name === 'totalFlats' ? 1 : 0, numValue)
+      }));
+    } else if (name.startsWith('features.')) {
       const featureKey = name.split('.')[1];
       setForm(prev => ({
         ...prev,
@@ -164,11 +180,10 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
           [locationKey]: value,
         },
       }));
-      setFormErrors(prev => ({ ...prev, [`location.${locationKey}`]: '' }));
     } else {
       setForm(prev => ({
         ...prev,
-        [name]: value,
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
       }));
     }
   };
@@ -180,20 +195,20 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
     const fileArr = Array.from(files);
     const newPreviews = fileArr.map(file => URL.createObjectURL(file));
 
+    setNewImages(prev => [...prev, ...fileArr]);
     setImagePreviews(prev => [...prev, ...newPreviews]);
-    setForm(prev => ({
-      ...prev,
-      images: [...(prev.images || []), ...fileArr]
-    }));
   };
 
   const removeImage = (index: number) => {
+    if (index < existingImages.length) {
+      // Remove existing image
+      setExistingImages(prev => prev.filter((_, i) => i !== index));
+    } else {
+      // Remove new image
+      const newIndex = index - existingImages.length;
+      setNewImages(prev => prev.filter((_, i) => i !== newIndex));
+    }
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
-    setForm(prev => {
-      const newImages = [...(prev.images || [])];
-      newImages.splice(index, 1);
-      return {...prev, images: newImages};
-    });
   };
 
   const addAmenity = () => {
@@ -253,45 +268,59 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
       errors.parkingSpaces = 'Parking spaces cannot be negative';
     }
     
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (isNaN(form.totalFlats) || form.totalFlats <= 0) {
-      setFormErrors(prev => ({
-        ...prev,
-        totalFlats: 'Total flats must be at least 1'
-      }));
-      return;
-    }
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  
+  if (isNaN(form.totalFlats) || form.totalFlats <= 0) {
+    setFormErrors(prev => ({
+      ...prev,
+      totalFlats: 'Total flats must be at least 1'
+    }));
+    return;
+  }
 
-    if (validateForm()) {
-      try {
-        await onSubmit({
-          ...form,
-          managerId: form.managerId || undefined,
-          totalFlats: Number(form.totalFlats),
-          parkingSpaces: Number(form.parkingSpaces),
-          emergencyContact: form.emergencyContact.toString(),
-          maintenanceContact: form.maintenanceContact.toString(),
-        });
-        toast.success(initial.id ? 'Property updated successfully!' : 'Property created successfully!');
-      } catch (error: any) {
-        toast.error(error.response?.data?.message || error.message || 'An error occurred while saving the property');
-      }
+  if (validateForm()) {
+    try {
+      // Combine all images for submission - FIXED
+      const allImages = [...existingImages, ...newImages];
+      
+      // Ensure numeric fields are properly formatted
+      const submitData = {
+        ...form,
+        images: allImages,
+        managerId: form.managerId || undefined,
+        totalFlats: Number(form.totalFlats),
+        parkingSpaces: Number(form.parkingSpaces),
+        // Ensure status is included for updates
+        status: form.status || 'active'
+      };
+      
+      await onSubmit(submitData);
+      
+      // Clean up object URLs
+      imagePreviews.forEach(preview => {
+        if (preview.startsWith('blob:')) {
+          URL.revokeObjectURL(preview);
+        }
+      });
+      
+      toast.success(initialData.id ? 'Property updated successfully!' : 'Property created successfully!');
+    } catch (error: any) {
+      console.error('Submit error:', error);
+      toast.error(error.response?.data?.message || error.message || 'An error occurred while saving the property');
     }
-  };
-
+  }
+};
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 rounded-t-xl">
           <h2 className="text-xl font-semibold text-gray-900">
-            {initial.id ? 'Edit Property' : 'Add New Property'}
+            {initialData.id ? 'Edit Property' : 'Add New Property'}
           </h2>
         </div>
 
@@ -418,8 +447,6 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
             />
           </div>
 
-
-
           {/* Property Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
@@ -486,8 +513,25 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
               />
             </div>
           </div>
-
-          {/* Amenities and Common Areas */}
+              <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Status *
+              </label>
+              <select
+                name="status"
+                value={form.status || 'active'}
+                onChange={handleInputChange}
+                className={`w-full px-3 py-2 border ${formErrors.status ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                required
+                disabled={loading}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="maintenance">Maintenance</option>
+              </select>
+              {formErrors.status && <p className="mt-1 text-sm text-red-600">{formErrors.status}</p>}
+            </div>
+                      {/* Amenities and Common Areas */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Amenities
@@ -581,7 +625,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {initial.id ? 'Update Property' : 'Create Property'}
+              {initialData.id ? 'Update Property' : 'Create Property'}
             </Button>
           </div>
         </form>

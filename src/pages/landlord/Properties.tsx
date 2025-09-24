@@ -50,8 +50,7 @@ const Properties: React.FC = () => {
     isLoading, 
     error: queryError, 
     refetch: refetchProperties 
-  } = useGetHousesQuery({}, { refetchOnMountOrArgChange: true, refetchOnReconnect: true, pollingInterval: 1000});
-
+  } = useGetHousesQuery({}, { refetchOnMountOrArgChange: true, refetchOnReconnect: true });
 
   const houses = data?.data || [];
 
@@ -86,7 +85,6 @@ const Properties: React.FC = () => {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-
   const {
     data: unitsData,
     isLoading: unitsLoading,
@@ -114,7 +112,6 @@ const Properties: React.FC = () => {
     setSelectedProperty(property);
     setShowUnitsView(true);
     clearMessages();
-    refetchProperties();
   };
 
   const handleDelete = (id: string) => {
@@ -139,7 +136,6 @@ const Properties: React.FC = () => {
     clearMessages();
   };
 
-
   const confirmDelete = async () => {
     if (deleteId) {
       try {
@@ -147,8 +143,9 @@ const Properties: React.FC = () => {
         showSuccess('Property deleted successfully');
         setDeleteId(null);
         refetchProperties();
-        if (showUnitsView && selectedProperty) {
-          refetchUnits();
+        if (showUnitsView && selectedProperty?.id === deleteId) {
+          setShowUnitsView(false);
+          setSelectedProperty(null);
         }
       } catch (error) {
         const apiError = error as ApiError;
@@ -171,139 +168,155 @@ const Properties: React.FC = () => {
     }
   };
 
+  // Fixed FormData handling for properties
   const handleFormSubmit = async (data: PropertyFormData) => {
-    try {
-      const formData = new FormData();
-      
-      Object.entries(data).forEach(([key, value]) => {
-        if (key !== 'images' && key !== 'managerId'){
-          formData.append(key, typeof value === 'object' 
-            ? JSON.stringify(value) 
-            : String(value));
-        }
+  try {
+    const formData = new FormData();
+    
+    // Append all simple fields
+    const simpleFields = [
+      'name', 'address', 'description', 'propertyType', 
+      'totalFlats', 'parkingSpaces', 'maintenanceContact', 
+      'emergencyContact', 'managerId', 'status'
+    ];
+
+    simpleFields.forEach(field => {
+      const value = data[field as keyof PropertyFormData];
+      if (value !== undefined && value !== null) {
+        formData.append(field, value.toString());
+      }
+    });
+
+    // Handle arrays properly
+    if (Array.isArray(data.amenities)) {
+      data.amenities.forEach((amenity, index) => {
+        formData.append(`amenities[${index}]`, amenity);
       });
-
-      if (data.managerId) {
-        formData.append('managerId', data.managerId);
-      }
-
-      if (editing) {
-        const existingImages = editing.images || [];
-        const newImages = Array.isArray(data.images) 
-          ? data.images.filter(img => img instanceof File)
-          : [];
-          
-        existingImages.forEach((img) => {
-          if (typeof img === 'object' && img.url) {
-            formData.append('existingImages', JSON.stringify(img));
-          }
-        });
-        
-        newImages.forEach(file => {  
-          formData.append('images', file);  
-        });
-      } else {
-        if (Array.isArray(data.images)) {
-          data.images.forEach(file => {
-            if (file instanceof File) {
-              formData.append('images', file);  
-            }
-          });
-        }
-      }
-
-      if (editing) {
-        await updateHouse({ id: editing.id, formData }).unwrap();
-        showSuccess('Property updated successfully');
-      } else {
-        await createHouse(formData).unwrap();
-        showSuccess('Property created successfully');
-      }
-      
-      setShowForm(false);
-      setEditing(null);
-      refetchProperties();
-      if (showUnitsView && selectedProperty) {
-        refetchUnits();
-      }
-    } catch (error) {
-      console.error('Error saving property:', error);
-      const apiError = error as ApiError;
-      showError(apiError.response?.data?.message || 'Failed to save property');
     }
-  };
 
+    if (Array.isArray(data.commonAreas)) {
+      data.commonAreas.forEach((area, index) => {
+        formData.append(`commonAreas[${index}]`, area);
+      });
+    }
+
+    // Handle nested objects
+    if (data.location) {
+      formData.append('location', JSON.stringify(data.location));
+    }
+
+    if (data.features) {
+      formData.append('features', JSON.stringify(data.features));
+    }
+
+    // Handle images - separate existing from new
+    const existingImages = data.images.filter(img => 
+      typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
+    );
+    const newImages = data.images.filter(img => img instanceof File);
+
+    // Append existing images as JSON array
+    if (existingImages.length > 0) {
+      formData.append('existingImages', JSON.stringify(existingImages));
+    }
+
+    // Append new images as files
+    newImages.forEach((image) => {
+      formData.append('images', image);
+    });
+
+    if (editing) {
+      await updateHouse({ id: editing.id, formData }).unwrap();
+      showSuccess('Property updated successfully');
+    } else {
+      await createHouse(formData).unwrap();
+      showSuccess('Property created successfully');
+    }
+    
+    setShowForm(false);
+    setEditing(null);
+    refetchProperties();
+    
+  } catch (error) {
+    console.error('Error saving property:', error);
+    const apiError = error as ApiError;
+    showError(apiError.response?.data?.message || 'Failed to save property');
+  }
+};
+
+  // Fixed unit form submission
   const handleUnitFormSubmit = async (data: UnitFormData) => {
-    if (!selectedProperty) return;
+  if (!selectedProperty) return;
+  
+  try {
+    const formData = new FormData();
     
-    try {
-      const formData = new FormData();
-      
-      Object.entries(data).forEach(([key, value]) => {
-        if (key !== 'images') {
-          formData.append(key, typeof value === 'object' 
-            ? JSON.stringify(value) 
-            : String(value));
+    // Append all simple fields
+    const simpleFields = [
+      'name', 'number', 'description', 'floorNumber', 'size', 
+      'bedrooms', 'palour', 'toilet', 'kitchen', 'bathrooms', 
+      'furnished', 'rentAmount', 'depositAmount', 'rentDueDay', 
+      'tenantId', 'status', 'houseId'
+    ];
+
+    simpleFields.forEach(field => {
+      const value = data[field as keyof UnitFormData];
+      if (value !== undefined && value !== null) {
+        // Convert boolean to string
+        if (typeof value === 'boolean') {
+          formData.append(field, value.toString());
+        } else {
+          formData.append(field, value.toString());
         }
+      }
+    });
+
+    // Handle arrays properly
+    if (Array.isArray(data.utilities)) {
+      data.utilities.forEach((utility, index) => {
+        formData.append(`utilities[${index}]`, utility);
       });
-
-      if (editingUnit) {
-        const existingImages = editingUnit.images || [];
-        const newImages = Array.isArray(data.images) 
-          ? data.images.filter(img => img instanceof File)
-          : [];
-         
-        
-        existingImages.forEach((img) => {
-          if (typeof img === 'object' && img.url) {
-            formData.append('existingImages', JSON.stringify(img));
-          }
-        });
-        
-        newImages.forEach(file => {
-          if (file instanceof File) {
-            formData.append('images', file);
-          }
-        });
-
-    
-        if (data.tenantId && editingUnit.status !== 'occupied') {
-          formData.append('status', 'occupied');
-        } else if (!data.tenantId && editingUnit.status === 'occupied') {
-          formData.append('status', 'vacant');
-        }
-      } else {
-        if (Array.isArray(data.images)) {
-          data.images.forEach(file => {
-            if (file instanceof File) {
-              formData.append('images', file);
-            }
-          });
-        }
-        
-   
-        
-      }
-
-      if (editingUnit) {
-        await updateUnit({ id: editingUnit.id, formData }).unwrap();
-        showSuccess('Unit updated successfully');
-      } else {
-        await createUnit({ houseId: selectedProperty.id, formData }).unwrap();
-        showSuccess('Unit created successfully');
-      }
-      
-      setShowUnitForm(false);
-      setEditingUnit(null);
-      refetchUnits();
-    } catch (error) {
-      console.error('Error saving unit:', error);
-      const apiError = error as ApiError;
-      showError(apiError.response?.data?.message || 'Failed to save unit');
     }
-  };
 
+    // Handle nested features
+    if (data.features) {
+      formData.append('features', JSON.stringify(data.features));
+    }
 
+    // Handle images - separate existing from new
+    const existingImages = data.images.filter(img => 
+      typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
+    );
+    const newImages = data.images.filter(img => img instanceof File);
+
+    // Append existing images as JSON array
+    if (existingImages.length > 0) {
+      formData.append('existingImages', JSON.stringify(existingImages));
+    }
+
+    // Append new images as files
+    newImages.forEach((image) => {
+      formData.append('images', image);
+    });
+
+    if (editingUnit) {
+      await updateUnit({ id: editingUnit.id, formData }).unwrap();
+      showSuccess('Unit updated successfully');
+    } else {
+      await createUnit({ houseId: selectedProperty.id, formData }).unwrap();
+      showSuccess('Unit created successfully');
+    }
+    
+    setShowUnitForm(false);
+    setEditingUnit(null);
+    refetchUnits();
+    
+  } catch (error) {
+    console.error('Error saving unit:', error);
+    const apiError = error as ApiError;
+    showError(apiError.response?.data?.message || 'Failed to save unit');
+  }
+};
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -323,89 +336,91 @@ const Properties: React.FC = () => {
     );
   }
 
- // Units view
-if (showUnitsView && selectedProperty) {
-  return (
-    <div className="space-y-6">
-      {success && <SuccessMessage message={success} />}
-      {error && <ErrorMessage message={error} />}
+  // Units view
+  if (showUnitsView && selectedProperty) {
+    return (
+      <div className="space-y-6">
+        {success && <SuccessMessage message={success} />}
+        {error && <ErrorMessage message={error} />}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <Button
-            variant="secondary"
-            icon={<Building2 size={20} />}
-            onClick={() => {
-              setShowUnitsView(false);
-              refetchProperties();
-            }}
-          >
-            Back to Properties
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{selectedProperty.name}</h1>
-            <p className="text-gray-600">{selectedProperty.address}</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Button
+              variant="secondary"
+              icon={<Building2 size={20} />}
+              onClick={() => {
+                setShowUnitsView(false);
+                setSelectedProperty(null);
+                refetchProperties();
+              }}
+            >
+              Back to Properties
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">{selectedProperty.name}</h1>
+              <p className="text-gray-600">{selectedProperty.address}</p>
+            </div>
           </div>
-        </div>
-        <Button variant="primary" icon={<Plus size={20} />} onClick={handleAddUnit}>
-          Add Unit
-        </Button>
-      </div>
-
-      {unitsLoading ? (
-        <div className="flex items-center justify-center min-h-48">
-          <LoadingSpinner size="md" text="Loading units..." />
-        </div>
-      ) : unitsError ? (
-        <div className="p-6">
-          <ErrorMessage 
-            message="Failed to load units. Please try again."
-            onRetry={() => refetchUnits()}
-          />
-        </div>
-      ) : units.length === 0 ? (
-        <div className="text-center py-12">
-          <Home className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No units yet</h3>
-          <p className="text-gray-500 mb-6">Get started by adding your first unit to this property</p>
           <Button variant="primary" icon={<Plus size={20} />} onClick={handleAddUnit}>
-            Add Your First Unit
+            Add Unit
           </Button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {units.map((unit: Unit) => (
-            <UnitCard
-              key={unit.id}
-              unit={unit}
-              onEdit={handleEditUnit}
-              onDelete={handleDeleteUnit}
+
+        {unitsLoading ? (
+          <div className="flex items-center justify-center min-h-48">
+            <LoadingSpinner size="md" text="Loading units..." />
+          </div>
+        ) : unitsError ? (
+          <div className="p-6">
+            <ErrorMessage 
+              message="Failed to load units. Please try again."
+              onRetry={() => refetchUnits()}
             />
-          ))}
-        </div>
-      )}
+          </div>
+        ) : units.length === 0 ? (
+          <div className="text-center py-12">
+            <Home className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No units yet</h3>
+            <p className="text-gray-500 mb-6">Get started by adding your first unit to this property</p>
+            <Button variant="primary" icon={<Plus size={20} />} onClick={handleAddUnit}>
+              Add Your First Unit
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {units.map((unit: Unit) => (
+              <UnitCard
+                key={unit.id}
+                unit={unit}
+                onEdit={handleEditUnit}
+                onDelete={handleDeleteUnit}
+              />
+            ))}
+          </div>
+        )}
 
-      {showUnitForm && (
-        <UnitForm
-          houseId={selectedProperty.id}
-          initial={editingUnit || undefined}
-          onSubmit={handleUnitFormSubmit}
-          onClose={() => setShowUnitForm(false)}
-          loading={isCreatingUnit || isUpdatingUnit}
+        {showUnitForm && (
+          <UnitForm
+            houseId={selectedProperty.id}
+            initial={editingUnit || undefined}
+            onSubmit={handleUnitFormSubmit}
+            onClose={() => setShowUnitForm(false)}
+            loading={isCreatingUnit || isUpdatingUnit}
+          />
+        )}
+
+        <DeleteModal
+          open={deleteUnitId !== null}
+          onConfirm={confirmDeleteUnit}
+          onCancel={() => setDeleteUnitId(null)}
+          loading={isDeletingUnit}
+          title="Delete Unit"
+          message="Are you sure you want to delete this unit? All associated data will be permanently removed."
         />
-      )}
+      </div>
+    );
+  }
 
-      <DeleteModal
-        open={deleteUnitId !== null}
-        onConfirm={confirmDeleteUnit}
-        onCancel={() => setDeleteUnitId(null)}
-        loading={isDeletingUnit}
-        title="Delete Unit"
-        message="Are you sure you want to delete this unit? All associated data will be permanently removed."
-      />
-    </div>
-  );
-}
   // Main properties view
   return (
     <div className="space-y-6">
@@ -517,7 +532,7 @@ if (showUnitsView && selectedProperty) {
 
       {showForm && (
         <PropertyForm
-          initial={editing || undefined}
+          initial={editing || ""}
           onSubmit={handleFormSubmit}
           onClose={() => setShowForm(false)}
           loading={isCreating || isUpdating}
@@ -529,6 +544,8 @@ if (showUnitsView && selectedProperty) {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteId(null)}
         loading={isDeleting}
+        title="Delete Property"
+        message="Are you sure you want to delete this property? All associated units and data will be permanently removed."
       />
     </div>
   );

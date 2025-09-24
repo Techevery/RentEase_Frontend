@@ -42,13 +42,17 @@ export const propertyApi = createApi({
       invalidatesTags: ['Houses'],
     }),
     updateHouse: builder.mutation({
-      query: ({ id, formData }) => ({
-        url: `houses/${id}`,
-        method: 'PUT',
-        body: formData,
-      }),
-      invalidatesTags: ['Houses'],
-    }),
+  query: ({ id, formData }) => ({
+    url: `houses/${id}`,
+    method: 'PUT',
+    body: formData,
+   
+    headers: {
+      ...(formData instanceof FormData ? {} : { 'Content-Type': 'application/json' })
+    }
+  }),
+  invalidatesTags: ['Houses'],
+}),
     deleteHouse: builder.mutation({
       query: (id) => ({
         url: `houses/${id}`,
@@ -102,13 +106,17 @@ export const propertyApi = createApi({
       }),
       invalidatesTags: ['Flats'],
     }),
-    updateUnit: builder.mutation({
-      query: ({ id, formData }) => ({
-        url: `flats/${id}`,
-        method: 'PUT',
-        body: formData,
-      }),
-      invalidatesTags: (result,) => [
+  updateUnit: builder.mutation({
+  query: ({ id, formData }) => ({
+    url: `flats/${id}`,
+    method: 'PUT',
+    body: formData,
+    // Add form data headers for file uploads
+    headers: {
+      ...(formData instanceof FormData ? {} : { 'Content-Type': 'application/json' })
+    }
+  }),
+  invalidatesTags: (result) => [
     { type: 'Flats', id: result?.houseId },
     { type: 'Tenants', id: result?.houseId }
   ],

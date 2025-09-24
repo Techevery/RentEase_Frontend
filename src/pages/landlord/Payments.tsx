@@ -15,6 +15,7 @@ interface BackendPayment {
   paymentDate: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   paymentMethod: string;
+  paymentTypes: string[];
   receiptUrl?: string;
   tenantId: { name: string; _id: string } | null;
   houseId: { name: string; _id: string } | null;
@@ -33,6 +34,7 @@ interface Payment {
   date: string;
   status: string;
   method: string;
+  paymentTypes: string[];
   reference: string;
   receiptUrl?: string;
   approvalStatus: 'pending' | 'approved' | 'rejected';
@@ -50,6 +52,7 @@ const transformPayment = (payment: BackendPayment): Payment => ({
   date: payment.paymentDate,
   status: payment.status.toLowerCase(),
   method: payment.paymentMethod,
+  paymentTypes: payment.paymentTypes || ['Rent'],
   reference: payment._id,
   receiptUrl: payment.receiptUrl,
   approvalStatus: payment.status.toLowerCase() as 'pending' | 'approved' | 'rejected',
@@ -141,6 +144,9 @@ const TenantPropertyPaymentsModal: React.FC<{
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {payment.reference}
+                      </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {payment.paymentTypes.join(', ')}
                       </td>
                     </tr>
                   ))}
@@ -239,6 +245,10 @@ const PaymentDetailsModal: React.FC<{
             <div>
               <label className="block text-sm font-medium text-gray-500">Reference ID</label>
               <p className="mt-1 text-sm text-gray-900">{payment.reference}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-500">Payment Types</label>
+              <p className="mt-1 text-sm text-gray-900">{payment.paymentTypes.join(', ')}</p>
             </div>
 
             {payment.receiptUrl && (
@@ -395,24 +405,23 @@ const LandlordPayments: React.FC = () => {
     setTenantPropertyPayments({ tenant, property });
     setDetailsPayment(null);
   };
-
-  const handleExport = () => {
-    const csvRows = [
-      ['Reference', 'Tenant', 'Property', 'Unit', 'Amount', 'Date', 'Status', 'Method'].join(','),
-      ...filteredPayments.map((p: Payment) =>
-        [
-          p.reference,
-          `"${p.tenant}"`,
-          `"${p.property}"`,
-          `"${p.unit}"`,
-          p.amount,
-          p.date,
-          p.status,
-          `"${p.method}"`,
-        ].join(',')
-      ),
-    ];
-    
+const handleExport = () => {
+  const csvRows = [
+    ['Reference', 'Tenant', 'Property', 'Unit', 'Amount', 'Date', 'Status', 'Method', 'Payment Types'].join(','),
+    ...filteredPayments.map((p: Payment) =>
+      [
+        p.reference,
+        `"${p.tenant}"`,
+        `"${p.property}"`,
+        `"${p.unit}"`,
+        p.amount,
+        p.date,
+        p.status,
+        `"${p.method}"`,
+        `"${p.paymentTypes.join(', ')}"`,
+      ].join(',')
+    ),
+  ];
     const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -521,6 +530,9 @@ const LandlordPayments: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Method
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Payment Types
+                  </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -558,6 +570,12 @@ const LandlordPayments: React.FC = () => {
                       <div className="flex items-center">
                         <CreditCard size={16} className="mr-2" />
                         {payment.method}
+                      </div>
+                    </td>
+                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div className="flex items-center">
+                        <CreditCard size={16} className="mr-2" />
+                        {payment.paymentTypes.join(', ')}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

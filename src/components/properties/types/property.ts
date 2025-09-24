@@ -113,7 +113,8 @@ export interface PropertyFormData {
   features: HouseFeatures;
   location: PropertyLocation;
   maintenanceContact:string;
-  images?: any[];
+  images: any[];
+  status: 'active' | 'inactive' | 'maintenance';
 }
 
 export interface UnitFormData {
@@ -128,7 +129,7 @@ export interface UnitFormData {
   bedrooms: number;
   palour: boolean;
   toilet: number;
-  images?: any[];
+  images: any[];
   bathrooms:number;
   furnished:boolean;
   kitchen: boolean;
@@ -137,7 +138,7 @@ export interface UnitFormData {
   rentDueDay: number;
   utilities: string[]; 
   features: UnitFeatures;
-  status: 'occupied' | 'vacant' | 'maintenance' | 'reserved';
+  status: 'vacant' | 'occupied';
 }
 
 export interface Image {

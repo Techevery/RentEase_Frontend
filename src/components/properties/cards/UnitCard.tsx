@@ -39,9 +39,38 @@ const UnitCard: React.FC<UnitCardProps> = ({ unit, onEdit, onDelete }) => {
     }
   };
 
-  const primaryImage = unit.images?.find(img => img.isPrimary)?.url || 
-                      unit.images?.[0]?.url || 
-                      'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=400';
+  // Handle different image formats (string, object with url, or object with url property)
+  const getImageUrl = (image: any): string => {
+    if (typeof image === 'string') return image;
+    if (typeof image === 'object' && image.url) return image.url;
+    if (typeof image === 'object' && image.path) return image.path;
+    return 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=400';
+  };
+
+  const primaryImage = unit.images && unit.images.length > 0 
+    ? getImageUrl(unit.images[0])
+    : 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=400';
+
+  // Get tenant information
+  const getTenantInfo = () => {
+  if (!unit.tenantId && !unit.tenant) return null;
+  
+  // Handle both tenantId (object) and tenant (populated) formats
+  const tenantData = unit.tenant || unit.tenantId;
+  
+  if (typeof tenantData === 'object' && tenantData !== null) {
+    return {
+      name: tenantData.name || 'Unknown Tenant',
+      id: tenantData._id || tenantData.id
+    };
+  }
+  
+  return {
+    name: 'Tenant',
+    id: unit.tenantId
+  };
+};
+  const tenantInfo = getTenantInfo();
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-all duration-300">
@@ -50,6 +79,10 @@ const UnitCard: React.FC<UnitCardProps> = ({ unit, onEdit, onDelete }) => {
           src={primaryImage}
           alt={unit.name}
           className="w-full h-32 object-cover"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.src = 'https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=400';
+          }}
         />
         <div className="absolute top-2 right-2">
           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(unit.status)}`}>
@@ -64,34 +97,36 @@ const UnitCard: React.FC<UnitCardProps> = ({ unit, onEdit, onDelete }) => {
           <div>
             <h4 className="text-md font-semibold text-gray-900">{unit.name}</h4>
             <p className="text-sm text-gray-500">Unit No: {unit.number}</p>
-            {unit.tenantId && (
+            {tenantInfo && (
               <p className="text-sm text-gray-500 flex items-center mt-1">
                 <User className="w-3 h-3 mr-1 text-gray-400" />
                 <span className="font-medium text-green-600">
-                  {typeof unit.tenantId === 'object' ? unit.tenantId?.name : 'Tenant'}
+                  {tenantInfo.name}
                 </span>
               </p>
             )}
           </div>
         </div>
 
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2">{unit.description}</p>
+        {unit.description && (
+          <p className="text-gray-600 text-sm mb-3 line-clamp-2">{unit.description}</p>
+        )}
 
         <div className="grid grid-cols-2 gap-2 mb-3 text-sm">
           <div className="flex items-center space-x-1">
             <Bed className="w-3 h-3 text-gray-400" />
-            <span className="text-gray-600">{unit.bedrooms} Bed</span>
+            <span className="text-gray-600">{unit.bedrooms || 0} Bed</span>
           </div>
           <div className="flex items-center space-x-1">
             <Bath className="w-3 h-3 text-gray-400" />
-            <span className="text-gray-600">{unit.bathrooms} Bath</span>
+            <span className="text-gray-600">{unit.bathrooms || 0} Bath</span>
           </div>
           <div className="flex items-center space-x-1">
             <Home className="w-3 h-3 text-gray-400" />
-            <span className="text-gray-600">Floor {unit.floorNumber}</span>
+            <span className="text-gray-600">Floor {unit.floorNumber || 1}</span>
           </div>
           <div className="flex items-center space-x-1">
-            <span className="text-gray-600">₦{unit.rentAmount?.toLocaleString()}</span>
+            <span className="text-gray-600">₦{(unit.rentAmount || 0).toLocaleString()}</span>
           </div>
         </div>
 
@@ -108,9 +143,6 @@ const UnitCard: React.FC<UnitCardProps> = ({ unit, onEdit, onDelete }) => {
         </div>
 
         <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-          {/* <div className="text-xs text-gray-500">
-            Due: {unit.rentDueDay}{unit.rentDueDay === 1 ? 'st' : unit.rentDueDay === 2 ? 'nd' : unit.rentDueDay === 3 ? 'rd' : 'th'} of month
-          </div> */}
           <div className="flex space-x-1">
             <Button variant="secondary" size="sm" icon={<Edit2 size={14} />} onClick={() => onEdit(unit)}>
               Edit

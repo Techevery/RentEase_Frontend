@@ -33,16 +33,16 @@ export const tenantApi = createApi({
       invalidatesTags: ['Tenants'],
     }),
     updateTenant: builder.mutation({
-      query: ({ id, ...tenantData }) => ({
+      query: ({ id, data }) => ({
         url: `${id}`,
         method: 'PUT',
-        body: tenantData,
+        body: data,
       }),
       invalidatesTags: ['Tenants'],
     }),
     deleteTenant: builder.mutation({
       query: ({ id, mode }) => ({
-        url: `${id}${mode === 'deactivate' ? '?mode=deactivate' : ''}`,
+        url: `${id}${mode ? `?mode=${mode}` : ''}`,
         method: 'DELETE',
       }),
       invalidatesTags: ['Tenants'],
@@ -54,6 +54,7 @@ export const tenantApi = createApi({
       }),
       invalidatesTags: ['Tenants'],
     }),
+   
     assignTenantToFlat: builder.mutation({
       query: ({ tenantId, flatId }) => ({
         url: `${tenantId}/assign-flat/${flatId}`,

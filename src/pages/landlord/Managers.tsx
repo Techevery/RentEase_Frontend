@@ -230,7 +230,7 @@ const LandlordManagers: React.FC = () => {
       setEditing(null);
     } catch (error) {
        const apiError = error as ApiError;
-      const errorMessage = apiError. response?.data?.message || apiError?.message || 'An error occurred';
+      const errorMessage = apiError. response?.data?.message || apiError?.message || 'Email already in use';
       showToast(errorMessage, 'error');
     }
   };

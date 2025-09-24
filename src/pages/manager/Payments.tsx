@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { CreditCard, Search, Filter, Upload, Download, X, RefreshCw } from 'lucide-react';
+import { CreditCard, Search, Filter, Upload, Download, X, RefreshCw, Check } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -11,13 +11,13 @@ import {
   useGetManagedPropertiesQuery,
 } from '../../redux/services/managerApi';
 
-
 interface BackendPayment {
   _id: string;
   amount: number;
   paymentDate: string;
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   paymentMethod: string;
+  paymentTypes: string[];
   receiptUrl?: string;
   tenantId: { name: string } | null;
   houseId: { name: string } | null;
@@ -33,6 +33,7 @@ interface Payment {
   date: string;
   status: string;
   method: string;
+  paymentTypes: string[];
 }
 
 interface Tenant {
@@ -44,12 +45,12 @@ interface Unit {
   _id: string;
   number: string;
   tenant?: Tenant;
-  
 }
+
 interface Property {
-    _id: string;
-    name: string;
-    units: Unit[];
+  _id: string;
+  name: string;
+  units: Unit[];
 }
 
 const transformPayment = (payment: BackendPayment): Payment => ({
@@ -61,8 +62,8 @@ const transformPayment = (payment: BackendPayment): Payment => ({
   date: payment.paymentDate,
   status: payment.status.toLowerCase(), 
   method: payment.paymentMethod,
+  paymentTypes: payment.paymentTypes || ['Rent'],
 });
-
 
 interface Tenant {
   _id: string;
@@ -70,6 +71,23 @@ interface Tenant {
   email: string;
   phone: string;
 }
+
+const PaymentTypeCheckbox: React.FC<{
+  type: string;
+  label: string;
+  checked: boolean;
+  onChange: (type: string, checked: boolean) => void;
+}> = ({ type, label, checked, onChange }) => (
+  <label className="flex items-center space-x-2">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onChange(type, e.target.checked)}
+      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+    />
+    <span className="text-sm">{label}</span>
+  </label>
+);
 
 const UploadPaymentModal: React.FC<{
   open: boolean;
@@ -87,11 +105,8 @@ const UploadPaymentModal: React.FC<{
     pollingInterval: 10000 
   });
 
-  console.log({propertiesData})
-
-   const houses = propertiesData?.data?.properties || [];
-console.log({houses})
-
+  const houses = propertiesData?.data?.properties || [];
+  
   const [form, setForm] = useState({
     tenantId: '',
     flatId: '',  
@@ -102,9 +117,19 @@ console.log({houses})
     description: '',
     receipt: null as File | null,
     propertyId: '',
+    paymentTypes: ['Rent'] as string[],
   });
   
   const [receiptUrl, setReceiptUrl] = useState('');
+
+  // Payment type options
+  const paymentTypeOptions = [
+    { value: 'Rent', label: 'Rent' },
+    { value: 'Service Charge', label: 'Service Charge' },
+    { value: 'Caution', label: 'Caution' },
+    { value: 'Agency', label: 'Agency' },
+    { value: 'Legal', label: 'Legal (Agreement)' },
+  ];
 
   // Get all units and tenants from the selected property
   const { units, tenants } = useMemo(() => {
@@ -188,15 +213,40 @@ console.log({houses})
     }
   };
 
+  const handlePaymentTypeChange = (type: string, checked: boolean) => {
+    setForm(prev => {
+      if (checked) {
+        // Add the payment type if checked
+        return {
+          ...prev,
+          paymentTypes: [...prev.paymentTypes, type]
+        };
+      } else {
+        // Remove the payment type if unchecked, but ensure at least one remains
+        const filteredTypes = prev.paymentTypes.filter(t => t !== type);
+        return {
+          ...prev,
+          paymentTypes: filteredTypes.length > 0 ? filteredTypes : ['Rent']
+        };
+      }
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     const formData = new FormData();
     
+    // Append all form fields
     Object.entries(form).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
         if (key === 'receipt' && value instanceof File) {
           formData.append('receipt', value);
+        } else if (key === 'paymentTypes' && Array.isArray(value)) {
+          // Append each payment type as a separate field
+          value.forEach(type => {
+            formData.append('paymentTypes', type);
+          });
         } else {
           formData.append(key, value.toString());
         }
@@ -363,6 +413,21 @@ console.log({houses})
           </div>
           
           <div>
+            <label className="block text-sm mb-1">Payment For</label>
+            <div className="grid grid-cols-2 gap-2 p-2 border rounded">
+              {paymentTypeOptions.map((option) => (
+                <PaymentTypeCheckbox
+                  key={option.value}
+                  type={option.value}
+                  label={option.label}
+                  checked={form.paymentTypes.includes(option.value)}
+                  onChange={handlePaymentTypeChange}
+                />
+              ))}
+            </div>
+          </div>
+          
+          <div>
             <label className="block text-sm mb-1">Description</label>
             <textarea
               name="description"
@@ -425,14 +490,13 @@ const ManagerPayments: React.FC = () => {
   const [createPayment, { isLoading: isUploading }] = useCreatePaymentMutation();
   const [showUpload, setShowUpload] = useState(false);
 
-
   const handleExport = () => {
     if (!paymentsData) return;
     
     const payments = (paymentsData as any).data?.map(transformPayment) || [];
     
     const csvRows = [
-      ['Tenant', 'Property', 'Unit', 'Amount', 'Date', 'Status', 'Method'].join(','),
+      ['Tenant', 'Property', 'Unit', 'Amount', 'Date', 'Status', 'Method', 'Payment Types'].join(','),
       ...payments.map((p: Payment) =>
         [
           `"${p.tenant}"`,
@@ -442,6 +506,7 @@ const ManagerPayments: React.FC = () => {
           p.date,
           p.status,
           `"${p.method}"`,
+          `"${p.paymentTypes.join(', ')}"`,
         ].join(',')
       ),
     ];
@@ -460,10 +525,6 @@ const ManagerPayments: React.FC = () => {
   
   if (isError) {
     return <div className="p-8 text-center text-red-600">Failed to load payments.</div>;
-  }
-
-  if (isError) {
-    return <div className="p-8 text-center text-red-600">Failed to load properties.</div>;
   }
 
   const backendPayments = (paymentsData as any)?.data || [];
@@ -488,7 +549,6 @@ const ManagerPayments: React.FC = () => {
             variant="primary"
             icon={<Upload size={20} />}
             onClick={() => setShowUpload(true)}
-            // disabled={isLoadingProperties || houses.length === 0}
           >
             Upload Payment
           </Button>
@@ -545,6 +605,9 @@ const ManagerPayments: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Method
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Payment For
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -580,6 +643,9 @@ const ManagerPayments: React.FC = () => {
                         <CreditCard size={16} className="mr-2" />
                         {payment.method}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {payment.paymentTypes.join(', ')}
                     </td>
                   </tr>
                 ))}

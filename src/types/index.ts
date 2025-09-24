@@ -629,20 +629,31 @@ export interface Unit {
 }
 
 export interface Tenant {
-   tenants:string;
-   id: string;
-   _id: string;
+  tenants: string;
+  id: string;
+  _id: string;
   name: string;
   email: string;
   phone: string;
-  property: string;
+  property: string | {
+    _id: string;
+    name: string;
+    address?: string;
+  };
   propertyAddress?: string;
-  unit: string;
+  unit: string | {
+    _id: string;
+    name: string;
+    number: string;
+  };
   leaseStartDate: string;
   leaseEndDate: string;
   rentAmount: number;
+  cautionFee?: number;
+  serviceCharge?: number;
+  totalRent?: number;
   status: 'active' | 'inactive';
-   lastPayment?: string | Date | null;
+  lastPayment?: string | Date | null;
   lastPaymentAmount?: number;
   lastPaymentStatus?: string;
   nextPayment?: string | Date | null;
@@ -658,7 +669,26 @@ export interface Tenant {
       address: string;
     };
   };
- 
+  landlordId?: string;
+  managerId?: string;
+  userId?: string;
+  
+  // New fields based on TenantProfileModal usage
+  emergencyContactName?: string;
+  emergencyContactAddress?: string;
+  maritalStatus?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  currentAddress?: string;
+  yearsAtCurrentAddress?: number;
+  monthsAtCurrentAddress?: number;
+  reasonForLeaving?: string;
+  occupation?: string;
+  position?: string;
+  spouseName?: string;
+  agencyFee?: number;
+  legalFee?: number;
 }
 
 export interface Payment {

@@ -33,7 +33,7 @@ const Login: React.FC = () => {
     values,
     errors,
     handleChange,
-  } = useFormValidation(loginSchema, { email: '', password: '', role: 'landlord' });
+  } = useFormValidation(loginSchema, { email: '', password: '', role: 'manager' });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,9 +130,10 @@ const Login: React.FC = () => {
                 value={values.role}
                 onChange={handleChange('role')}
                 className="mt-1 block w-full pl-3 pr-10 py-2 border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
-              >
-                <option value="landlord">Landlord</option>
+              > 
                 <option value="manager">Manager</option>
+                <option value="landlord">Landlord</option>  
+              
               </select>
               {errors.role && <p className="mt-1 text-sm text-red-600">{errors.role}</p>}
             </div>
