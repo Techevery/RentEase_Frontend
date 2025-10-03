@@ -20,12 +20,11 @@ import NotFound from './pages/NotFound';
 import Settings from './pages/Setting'
 import { ToastContainer } from 'react-toastify';
 
-
 function App() {
   return (
-          <HashRouter>
-          <div>
-              <ToastContainer 
+    <HashRouter>
+      <div>
+        <ToastContainer 
           position="bottom-right"
           autoClose={2000}
           hideProgressBar={false}
@@ -36,51 +35,45 @@ function App() {
           draggable
           pauseOnHover
         />
-            <Routes>
-              
-            
-              {/* Auth Routes */}
-              <Route path="/login" element={<Login />} />
-
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/signup" element={<Signup />} />
+        <Routes>
+          {/* Auth Routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           
-              {/* Landlord Routes */}
-         
-              <Route path="/landlord" element={<ProtectedRoute role="landlord" />}>
-                <Route path="dashboard" element={<LandlordDashboard />} />
-                <Route path="properties" element={<LandlordProperties />} />
-                <Route path="managers" element={<LandlordManagers />} />
-                <Route path="tenants" element={<LandlordTenants />} />
-                <Route path="payments" element={<LandlordPayments />} />
-                <Route path="expenses" element={<LandlordExpenses />} />
-                <Route path="reports" element={<LandlordReports />} />
-                <Route index element={<Navigate to="/landlord/dashboard" replace />} />
-              </Route>
-              
-              {/* Manager Routes */}
-              <Route path="/manager" element={<ProtectedRoute role="manager" />}>
-                <Route path="dashboard" element={<ManagerDashboard />} />
-                <Route path="payments" element={<ManagerPayments />} />
-                <Route path="expenses" element={<ManagerExpenses />} />
-                <Route path="tenants" element={<ManagerTenants />} />
-                <Route index element={<Navigate to="/manager/dashboard" replace />} />
-              </Route>
+          {/* Landlord Routes */}
+          <Route path="/landlord" element={<ProtectedRoute role="landlord" />}>
+            <Route path="dashboard" element={<LandlordDashboard />} />
+            <Route path="properties" element={<LandlordProperties />} />
+            <Route path="managers" element={<LandlordManagers />} />
+            <Route path="tenants" element={<LandlordTenants />} />
+            <Route path="payments" element={<LandlordPayments />} />
+            <Route path="expenses" element={<LandlordExpenses />} />
+            <Route path="reports" element={<LandlordReports />} />
+            <Route index element={<Navigate to="/landlord/dashboard" replace />} />
+          </Route>
+          
+          {/* Manager Routes */}
+          <Route path="/manager" element={<ProtectedRoute role="manager" />}>
+            <Route path="dashboard" element={<ManagerDashboard />} />
+            <Route path="payments" element={<ManagerPayments />} />
+            <Route path="expenses" element={<ManagerExpenses />} />
+            <Route path="tenants" element={<ManagerTenants />} />
+            <Route index element={<Navigate to="/manager/dashboard" replace />} />
+          </Route>
     
-        
-              {/* Default Route */}
-              <Route path="/" element={<Navigate to="/login"/>} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/settings" element={<Settings />} />
-
-              
-              {/* 404 Route */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            </div>
-          </HashRouter>
-      
+          {/* Settings Route */}
+          <Route path="/settings" element={<Settings />} />
+          
+          {/* Default Route */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          
+          {/* 404 Route */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </div>
+    </HashRouter>
   );
 }
 
