@@ -23,9 +23,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ role }) => {
       </div>
     );
   }
-
+const isResetPasswordRoute = location.pathname.includes('/reset-password');
   // If not authenticated, redirect to login
-  if (!isAuthenticated) {
+  if(!isAuthenticated && !isResetPasswordRoute) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
