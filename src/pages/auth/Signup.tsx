@@ -89,6 +89,8 @@ if (isNaN(phoneNumber)) {
   toast.error('Invalid phone number format');
   return;
 }
+
+
       const { name, email, phonenumber, password, role } = formData;
       await register({ name, email, phonenumber, password, role }).unwrap();
 
@@ -96,7 +98,7 @@ if (isNaN(phoneNumber)) {
       navigate(`/${role}/dashboard`);
     } catch (error) {
       const apiError = error as ApiError;
-      console.error('Signup error:', apiError);
+   
       const errorMessage = apiError.data?.message || 'Signup failed';
       if (errorMessage.includes('email')) {
         toast.error('Email already exists');

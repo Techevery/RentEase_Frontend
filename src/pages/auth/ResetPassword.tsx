@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import toast from 'react-hot-toast';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { useResetPasswordMutation } from '../../redux/services/authApi';
-import { Eye, EyeOff, Lock } from 'lucide-react';
+import { Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 
 const resetPasswordSchema = z.object({
   password: z.string()
@@ -36,16 +37,63 @@ export const ResetPassword = () => {
     resolver: zodResolver(resetPasswordSchema),
   });
 
+  const showSuccessToast = () => {
+    toast.success(
+      <div className="flex items-center space-x-2">
+        <CheckCircle className="h-5 w-5 text-green-500" />
+        <span className="font-medium">Password reset successfully!</span>
+      </div>,
+      {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+        className: "border border-green-200 rounded-xl",
+      }
+    );
+  };
+
+  const showErrorToast = (message: string) => {
+    toast.error(
+      <div className="flex items-center space-x-2">
+        <span className="font-medium">{message}</span>
+      </div>,
+      {
+        position: "top-center",
+        autoClose: 5000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+        theme: "light",
+        className: "border border-red-200 rounded-xl",
+      }
+    );
+  };
+
   const onSubmit = async (data: ResetPasswordInputs) => {
     try {
       setError(null);
       await resetPassword({ token: token!, password: data.password }).unwrap();
-      toast.success('Password reset successfully! You can now login with your new password.');
-      navigate('/login');
-    } catch (error) { 
+      
+      // Show success toast
+      showSuccessToast();
+      
+      // Navigate after a short delay to let user see the success message
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+      
+    } catch (error: any) { 
       console.error('Reset password error:', error);
-      setError('Failed to reset password. The link may have expired. Please request a new reset link.');
-      toast.error('Failed to reset password');
+      const errorMessage = error?.data?.message || 'Failed to reset password. The link may have expired. Please request a new reset link.';
+      setError(errorMessage);
+      showErrorToast(errorMessage);
     }
   };
 
@@ -54,6 +102,22 @@ export const ResetPassword = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      {/* Toast Container */}
+      <ToastContainer
+        position="top-center"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+        toastClassName="rounded-xl shadow-lg"
+        progressClassName="bg-gradient-to-r from-indigo-500 to-purple-500"
+      />
+
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
           <div className="w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center">
@@ -89,9 +153,9 @@ export const ResetPassword = () => {
                   onClick={togglePasswordVisibility}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
                   )}
                 </button>
               </div>
@@ -118,9 +182,9 @@ export const ResetPassword = () => {
                   onClick={toggleConfirmPasswordVisibility}
                 >
                   {showConfirmPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <EyeOff className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
                   ) : (
-                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+                    <Eye className="h-5 w-5 text-gray-400 hover:text-gray-600 transition-colors" />
                   )}
                 </button>
               </div>
@@ -141,7 +205,7 @@ export const ResetPassword = () => {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200 transform hover:scale-[1.02]"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-[1.02]"
               >
                 {isLoading ? (
                   <div className="flex items-center">
