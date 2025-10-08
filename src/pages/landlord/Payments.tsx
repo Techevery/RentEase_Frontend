@@ -40,6 +40,26 @@ interface Payment {
   approvalStatus: 'pending' | 'approved' | 'rejected';
 }
 
+interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: BackendPayment[];
+  count: number;
+  pagination?: {
+    next?: { page: number; limit: number };
+    prev?: { page: number; limit: number };
+    currentPage?: number;
+    totalPages?: number;
+  };
+}
+
 const transformPayment = (payment: BackendPayment): Payment => ({
   id: payment._id,
   tenant: payment.tenantId?.name || 'Unknown Tenant',
@@ -112,6 +132,9 @@ const TenantPropertyPaymentsModal: React.FC<{
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Reference
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Payment Types
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -145,7 +168,7 @@ const TenantPropertyPaymentsModal: React.FC<{
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {payment.reference}
                       </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {payment.paymentTypes.join(', ')}
                       </td>
                     </tr>
@@ -311,7 +334,8 @@ const PaymentDetailsModal: React.FC<{
 };
 
 const LandlordPayments: React.FC = () => {
-  const { data, isLoading, isError, refetch } = useGetPaymentsQuery({}, {
+  const [currentPage, setCurrentPage] = useState(1);
+  const { data, isLoading, isError, refetch } = useGetPaymentsQuery({ page: currentPage, limit: 10 }, {
     pollingInterval: 60000 
   });
   const [approvePayment, { isLoading: isApproving }] = useApprovePaymentMutation();
@@ -321,6 +345,13 @@ const LandlordPayments: React.FC = () => {
   const [tenantPropertyPayments, setTenantPropertyPayments] = useState<{tenant: string; property: string} | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    hasNext: false,
+    hasPrev: false
+  });
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -329,13 +360,35 @@ const LandlordPayments: React.FC = () => {
 
   useEffect(() => {
     if (data) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const backendPayments = (data as any)?.data || [];
+      const apiResponse = data as ApiResponse;
+      const backendPayments = apiResponse?.data || [];
       const transformedPayments = backendPayments.map(transformPayment);
+      
       setPayments(transformedPayments);
       setFilteredPayments(transformedPayments);
+      
+      // Set pagination info
+      if (apiResponse.pagination) {
+        const paginationData = apiResponse.pagination;
+        setPagination({
+          currentPage: paginationData.currentPage || currentPage,
+          totalPages: paginationData.totalPages || Math.ceil(apiResponse.count / 10),
+          totalCount: apiResponse.count || 0,
+          hasNext: !!paginationData.next,
+          hasPrev: !!paginationData.prev
+        });
+      } else {
+        // Fallback if pagination data is not available
+        setPagination({
+          currentPage: currentPage,
+          totalPages: Math.ceil(apiResponse.count / 10),
+          totalCount: apiResponse.count || 0,
+          hasNext: (currentPage * 10) < (apiResponse.count || 0),
+          hasPrev: currentPage > 1
+        });
+      }
     }
-  }, [data]);
+  }, [data, currentPage]);
 
   // Apply filters whenever search term, property, status, or payments change
   useEffect(() => {
@@ -405,23 +458,24 @@ const LandlordPayments: React.FC = () => {
     setTenantPropertyPayments({ tenant, property });
     setDetailsPayment(null);
   };
-const handleExport = () => {
-  const csvRows = [
-    ['Reference', 'Tenant', 'Property', 'Unit', 'Amount', 'Date', 'Status', 'Method', 'Payment Types'].join(','),
-    ...filteredPayments.map((p: Payment) =>
-      [
-        p.reference,
-        `"${p.tenant}"`,
-        `"${p.property}"`,
-        `"${p.unit}"`,
-        p.amount,
-        p.date,
-        p.status,
-        `"${p.method}"`,
-        `"${p.paymentTypes.join(', ')}"`,
-      ].join(',')
-    ),
-  ];
+
+  const handleExport = () => {
+    const csvRows = [
+      ['Reference', 'Tenant', 'Property', 'Unit', 'Amount', 'Date', 'Status', 'Method', 'Payment Types'].join(','),
+      ...filteredPayments.map((p: Payment) =>
+        [
+          p.reference,
+          `"${p.tenant}"`,
+          `"${p.property}"`,
+          `"${p.unit}"`,
+          p.amount,
+          p.date,
+          p.status,
+          `"${p.method}"`,
+          `"${p.paymentTypes.join(', ')}"`,
+        ].join(',')
+      ),
+    ];
     const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -430,6 +484,14 @@ const handleExport = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => prev + 1);
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1));
   };
 
   // Get unique properties and statuses for filter dropdowns
@@ -460,7 +522,10 @@ const handleExport = () => {
             icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
             </svg>} 
-            onClick={() => refetch()}
+            onClick={() => {
+              setCurrentPage(1);
+              refetch();
+            }}
             disabled={isLoading}
           >
             Refresh
@@ -572,7 +637,7 @@ const handleExport = () => {
                         {payment.method}
                       </div>
                     </td>
-                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <CreditCard size={16} className="mr-2" />
                         {payment.paymentTypes.join(', ')}
@@ -624,13 +689,24 @@ const handleExport = () => {
 
           <div className="mt-6 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Showing {filteredPayments.length} of {payments.length} payments
+              Showing {filteredPayments.length} of {pagination.totalCount} payments
+              {pagination.totalPages > 1 && ` (Page ${pagination.currentPage} of ${pagination.totalPages})`}
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" size="sm" disabled>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handlePrevPage}
+                disabled={!pagination.hasPrev || isLoading}
+              >
                 Previous
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleNextPage}
+                disabled={!pagination.hasNext || isLoading}
+              >
                 Next
               </Button>
             </div>

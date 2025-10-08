@@ -53,6 +53,26 @@ interface Property {
   units: Unit[];
 }
 
+interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: BackendPayment[];
+  count: number;
+  pagination?: {
+    next?: { page: number; limit: number };
+    prev?: { page: number; limit: number };
+    currentPage?: number;
+    totalPages?: number;
+  };
+}
+
 const transformPayment = (payment: BackendPayment): Payment => ({
   id: payment._id,
   tenant: payment.tenantId?.name || 'Unknown Tenant',
@@ -478,26 +498,103 @@ const UploadPaymentModal: React.FC<{
 };
 
 const ManagerPayments: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedProperty, setSelectedProperty] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  
   const { 
     data: paymentsData, 
     isLoading, 
     isError, 
     refetch 
-  } = useGetPaymentsQuery({}, {
+  } = useGetPaymentsQuery({ 
+    page: currentPage, 
+    limit: 10 
+  }, {
     pollingInterval: 60000 
   });
   
   const [createPayment, { isLoading: isUploading }] = useCreatePaymentMutation();
   const [showUpload, setShowUpload] = useState(false);
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    currentPage: 1,
+    totalPages: 1,
+    totalCount: 0,
+    hasNext: false,
+    hasPrev: false
+  });
+
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
+
+  // Process payments data and pagination
+  useEffect(() => {
+    if (paymentsData) {
+      const apiResponse = paymentsData as ApiResponse;
+      const backendPayments = apiResponse?.data || [];
+      const transformedPayments = backendPayments.map(transformPayment);
+      
+      setPayments(transformedPayments);
+      setFilteredPayments(transformedPayments);
+      
+      // Set pagination info
+      if (apiResponse.pagination) {
+        const paginationData = apiResponse.pagination;
+        setPagination({
+          currentPage: paginationData.currentPage || currentPage,
+          totalPages: paginationData.totalPages || Math.ceil(apiResponse.count / 10),
+          totalCount: apiResponse.count || 0,
+          hasNext: !!paginationData.next,
+          hasPrev: !!paginationData.prev
+        });
+      } else {
+        // Fallback if pagination data is not available
+        setPagination({
+          currentPage: currentPage,
+          totalPages: Math.ceil(apiResponse.count / 10),
+          totalCount: apiResponse.count || 0,
+          hasNext: (currentPage * 10) < (apiResponse.count || 0),
+          hasPrev: currentPage > 1
+        });
+      }
+    }
+  }, [paymentsData, currentPage]);
+
+  // Apply filters whenever search term, property, status, or payments change
+  useEffect(() => {
+    let result = [...payments];
+    
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(payment => 
+        payment.tenant.toLowerCase().includes(term) ||
+        payment.property.toLowerCase().includes(term) ||
+        payment.unit.toLowerCase().includes(term) ||
+        payment.method.toLowerCase().includes(term) ||
+        payment.amount.toString().includes(term) ||
+        payment.paymentTypes.some(type => type.toLowerCase().includes(term))
+      );
+    }
+    
+    // Apply property filter
+    if (selectedProperty !== 'all') {
+      result = result.filter(payment => payment.property === selectedProperty);
+    }
+    
+    // Apply status filter
+    if (selectedStatus !== 'all') {
+      result = result.filter(payment => payment.status === selectedStatus);
+    }
+    
+    setFilteredPayments(result);
+  }, [searchTerm, selectedProperty, selectedStatus, payments]);
 
   const handleExport = () => {
-    if (!paymentsData) return;
-    
-    const payments = (paymentsData as any).data?.map(transformPayment) || [];
-    
     const csvRows = [
       ['Tenant', 'Property', 'Unit', 'Amount', 'Date', 'Status', 'Method', 'Payment Types'].join(','),
-      ...payments.map((p: Payment) =>
+      ...filteredPayments.map((p: Payment) =>
         [
           `"${p.tenant}"`,
           `"${p.property}"`,
@@ -519,6 +616,30 @@ const ManagerPayments: React.FC = () => {
     link.click();
   };
 
+  const handleNextPage = () => {
+    setCurrentPage(prev => prev + 1);
+  };
+
+  const handlePrevPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  const handleUploadPayment = async (formData: FormData) => {
+    try {
+      await createPayment(formData).unwrap();
+      // Refresh the payments list after successful upload
+      refetch();
+      // Reset to first page to see the new payment
+      setCurrentPage(1);
+    } catch (error) {
+      console.error('Failed to upload payment:', error);
+    }
+  };
+
+  // Get unique properties and statuses for filter dropdowns
+  const uniqueProperties = [...new Set(payments.map(p => p.property))].filter(Boolean);
+  const statusOptions = ['pending', 'approved', 'rejected'];
+
   if (isLoading) {
     return <div className="p-8 text-center">Loading payments...</div>;
   }
@@ -526,9 +647,6 @@ const ManagerPayments: React.FC = () => {
   if (isError) {
     return <div className="p-8 text-center text-red-600">Failed to load payments.</div>;
   }
-
-  const backendPayments = (paymentsData as any)?.data || [];
-  const payments: Payment[] = backendPayments.map(transformPayment);
 
   return (
     <div className="space-y-6">
@@ -555,7 +673,11 @@ const ManagerPayments: React.FC = () => {
           <Button
             variant="outline"
             icon={<RefreshCw size={20} />}
-            onClick={() => refetch()}
+            onClick={() => {
+              setCurrentPage(1);
+              refetch();
+            }}
+            disabled={isLoading}
           >
             Refresh
           </Button>
@@ -570,13 +692,35 @@ const ManagerPayments: React.FC = () => {
                 id="search"
                 name="search"
                 type="text"
-                placeholder="Search payments..."
-                value=""
-                onChange={() => {}}
+                placeholder="Search payments by tenant, property, unit, amount..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 icon={<Search size={18} />}
               />
             </div>
             <div className="flex space-x-3">
+              <select 
+                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                value={selectedProperty}
+                onChange={(e) => setSelectedProperty(e.target.value)}
+              >
+                <option value="all">All Properties</option>
+                {uniqueProperties.map(property => (
+                  <option key={property} value={property}>{property}</option>
+                ))}
+              </select>
+              <select 
+                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+              >
+                <option value="all">All Status</option>
+                {statusOptions.map(status => (
+                  <option key={status} value={status}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </option>
+                ))}
+              </select>
               <Button variant="outline" icon={<Filter size={18} />}>
                 More Filters
               </Button>
@@ -611,7 +755,7 @@ const ManagerPayments: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {payments.map((payment) => (
+                {filteredPayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {payment.tenant}
@@ -653,15 +797,35 @@ const ManagerPayments: React.FC = () => {
             </table>
           </div>
 
+          {filteredPayments.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              {payments.length === 0 
+                ? 'No payments found.' 
+                : 'No payments match your search criteria.'
+              }
+            </div>
+          )}
+
           <div className="mt-6 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Showing {payments.length} payments
+              Showing {filteredPayments.length} of {pagination.totalCount} payments
+              {pagination.totalPages > 1 && ` (Page ${pagination.currentPage} of ${pagination.totalPages})`}
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" size="sm" disabled>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handlePrevPage}
+                disabled={!pagination.hasPrev || isLoading}
+              >
                 Previous
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleNextPage}
+                disabled={!pagination.hasNext || isLoading}
+              >
                 Next
               </Button>
             </div>
@@ -672,9 +836,7 @@ const ManagerPayments: React.FC = () => {
       <UploadPaymentModal
         open={showUpload}
         onClose={() => setShowUpload(false)}
-        onSubmit={async (formData) => {
-          await createPayment(formData);
-        }}
+        onSubmit={handleUploadPayment}
         loading={isUploading}
       />
     </div>
