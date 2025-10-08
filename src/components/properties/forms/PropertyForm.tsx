@@ -142,6 +142,20 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
     loadImagePreviews();
   }, [existingImages]);
 
+  // Check if form is valid for submission
+  const isFormValid = () => {
+    return (
+      form.name.trim() !== '' &&
+      form.address.trim() !== '' &&
+      (form.propertyType === 'residential' || form.propertyType === 'commercial') &&
+      form.totalFlats >= 1 &&
+      form.parkingSpaces >= 0 &&
+      form.emergencyContact.trim() !== '' &&
+      form.status &&
+      form.managerId !== '' // Manager is required
+    );
+  };
+
   const handleNumberChange = (name: string, value: number) => {
     setForm(prev => ({
       ...prev,
@@ -263,6 +277,12 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
     if (!form.propertyType) {
       errors.propertyType = 'Property type is required';
     }
+    if (!form.managerId) {
+      errors.managerId = 'Manager field is required. Please select a manager';
+    }
+    if (!form.status) {
+      errors.status = 'Status is required';
+    }
     
     if (form.parkingSpaces < 0) {
       errors.parkingSpaces = 'Parking spaces cannot be negative';
@@ -315,6 +335,7 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
     }
   }
 };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -601,14 +622,17 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
           {/* Manager Select Dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Assign Manager
+              Assign Manager *
             </label>
             <select
               name="managerId"
               value={form.managerId || ""}
               onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-3 py-2 border ${
+                formErrors.managerId ? 'border-red-500' : 'border-gray-300'
+              } rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
               disabled={loading || managersLoading}
+              required
             >
               <option value="">Select a manager</option>
               {managers.map((manager: { id: string; name: string }) => (
@@ -617,6 +641,9 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
                 </option>
               ))}
             </select>
+            {formErrors.managerId && (
+              <p className="mt-1 text-sm text-red-600">{formErrors.managerId}</p>
+            )}
           </div>
 
           {/* Form Actions */}
@@ -624,7 +651,11 @@ const PropertyForm: React.FC<PropertyFormProps> = ({
             <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || !isFormValid()}
+              title={!isFormValid() ? "Please fill all required fields including manager selection" : ""}
+            >
               {initialData.id ? 'Update Property' : 'Create Property'}
             </Button>
           </div>

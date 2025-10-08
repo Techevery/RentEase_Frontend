@@ -17,9 +17,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
 
-
-
-
   const logout = () => {
     dispatch(logoutAction());
   };
@@ -85,30 +82,47 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <Menu size={24} />
           </button>
 
-          <div className="flex items-center space-x-4">
-            
-
+          <div className="flex items-center justify-end flex-1">
             <div className="relative">
-              <button onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none">
-                <span className="hidden md:block text-sm font-medium">{user?.name}</span>
+              <button 
+                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)} 
+                className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none"
+              >
+                <span className="text-sm font-medium">{user?.name}</span>
                 <ChevronDown size={16} />
               </button>
 
               {profileDropdownOpen && (
-                <div className="absolute right-[-6] mt-2 w-48 bg-white rounded-md shadow-lg z-50">
-                  <div className="py-1">
-                    <div className="px- py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                      <p className="text-xs text-gray-500">{user?.email}</p>
+                <>
+                  {/* Backdrop for mobile */}
+                  <div 
+                    className="fixed inset-0 z-40 lg:hidden" 
+                    onClick={() => setProfileDropdownOpen(false)}
+                  ></div>
+                  
+                  {/* Dropdown menu */}
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200 lg:origin-top-right">
+                    <div className="py-1">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
+                      </div>
+                      <Link 
+                        to="/settings" 
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <Settings size={16} className="mr-2" /> Settings
+                      </Link>
+                      <button 
+                        onClick={logout} 
+                        className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <LogOut size={16} className="mr-2" /> Sign out
+                      </button>
                     </div>
-                    <Link to="/settings" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <Settings size={16} className="mr-2" /> Settings
-                    </Link>
-                    <button onClick={logout} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <LogOut size={16} className="mr-2" /> Sign out
-                    </button>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>

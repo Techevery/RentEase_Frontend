@@ -96,6 +96,26 @@ const Properties: React.FC = () => {
 
   const units = unitsData?.data || [];
 
+  // Frontend validation function for property form
+  const validatePropertyForm = (data: PropertyFormData): string | null => {
+    if (!data.name?.trim()) return 'Property name is required';
+    if (!data.address?.trim()) return 'Address is required';
+    if (!data.propertyType) return 'Property type is required';
+    if (!data.managerId) return 'Manager selection is required';
+    if (!data.status) return 'Status is required';
+    
+    // Validate numeric fields
+    if (data.totalFlats !== undefined && data.totalFlats < 0) return 'Total flats cannot be negative';
+    if (data.parkingSpaces !== undefined && data.parkingSpaces < 0) return 'Parking spaces cannot be negative';
+    
+    // Validate manager ID format
+    if (data.managerId && data.managerId.trim() === '') {
+      return 'Please select a valid manager';
+    }
+    
+    return null;
+  };
+
   const handleAdd = () => {
     setEditing(null);
     setShowForm(true);
@@ -168,186 +188,209 @@ const Properties: React.FC = () => {
     }
   };
 
-  // Fixed FormData handling for properties
-const handleFormSubmit = async (data: PropertyFormData) => {
-  try {
-    const formData = new FormData();
-    
-    console.log('Submitting property data:', data); // Debug log
-    
-    // Append all simple fields - FIXED: Ensure all fields are included
-    const simpleFields = [
-      'name', 'address', 'description', 'propertyType', 
-      'totalFlats', 'parkingSpaces', 'maintenanceContact', 
-      'emergencyContact', 'managerId', 'status'
-    ];
-
-    simpleFields.forEach(field => {
-      const value = data[field as keyof PropertyFormData];
-      if (value !== undefined && value !== null) {
-        // Handle different data types properly
-        if (typeof value === 'boolean') {
-          formData.append(field, value.toString());
-        } else if (Array.isArray(value)) {
-          // For arrays, join with commas
-          formData.append(field, value.join(','));
-        } else {
-          formData.append(field, value.toString());
-        }
-      } else {
-        // Explicitly set empty values for update
-        formData.append(field, '');
+  // Fixed FormData handling for properties with proper error handling
+  const handleFormSubmit = async (data: PropertyFormData) => {
+    try {
+      // Frontend validation
+      const validationError = validatePropertyForm(data);
+      if (validationError) {
+        showError(validationError);
+        return; // Stop submission if validation fails
       }
-    });
 
-    // Handle amenities array - FIXED
-    if (Array.isArray(data.amenities) && data.amenities.length > 0) {
-      formData.append('amenities', data.amenities.join(','));
-    } else {
-      formData.append('amenities', ''); // Explicitly set empty
-    }
+      const formData = new FormData();
+      
+      console.log('Submitting property data:', data);
+      
+      // Append all simple fields
+      const simpleFields = [
+        'name', 'address', 'description', 'propertyType', 
+        'totalFlats', 'parkingSpaces', 'maintenanceContact', 
+        'emergencyContact', 'managerId', 'status'
+      ];
 
-    // Handle commonAreas array - FIXED
-    if (Array.isArray(data.commonAreas) && data.commonAreas.length > 0) {
-      formData.append('commonAreas', data.commonAreas.join(','));
-    } else {
-      formData.append('commonAreas', ''); // Explicitly set empty
-    }
+      simpleFields.forEach(field => {
+        const value = data[field as keyof PropertyFormData];
+        if (value !== undefined && value !== null && value !== '') {
+          if (typeof value === 'boolean') {
+            formData.append(field, value.toString());
+          } else if (Array.isArray(value)) {
+            formData.append(field, value.join(','));
+          } else {
+            formData.append(field, value.toString());
+          }
+        } else {
+          // For managerId, ensure we don't send empty values that might cause backend errors
+          if (field === 'managerId') {
+            formData.append(field, '');
+          } else {
+            formData.append(field, '');
+          }
+        }
+      });
 
-    // Handle images - FIXED: Better separation and handling
-    const existingImages = data.images.filter(img => 
-      typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
-    );
-    const newImages = data.images.filter(img => img instanceof File);
+      // Handle amenities array
+      if (Array.isArray(data.amenities) && data.amenities.length > 0) {
+        formData.append('amenities', data.amenities.join(','));
+      } else {
+        formData.append('amenities', '');
+      }
 
-    console.log('Images - Existing:', existingImages.length, 'New:', newImages.length); // Debug log
+      // Handle commonAreas array
+      if (Array.isArray(data.commonAreas) && data.commonAreas.length > 0) {
+        formData.append('commonAreas', data.commonAreas.join(','));
+      } else {
+        formData.append('commonAreas', '');
+      }
 
-    // Append existing images as JSON array - FIXED
-    if (existingImages.length > 0) {
-      formData.append('existingImages', JSON.stringify(existingImages));
-    } else {
-      // Explicitly clear images if empty during update
+      // Handle images
+      const existingImages = data.images.filter(img => 
+        typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
+      );
+      const newImages = data.images.filter(img => img instanceof File);
+
+      console.log('Images - Existing:', existingImages.length, 'New:', newImages.length);
+
+      // Append existing images as JSON array
+      if (existingImages.length > 0) {
+        formData.append('existingImages', JSON.stringify(existingImages));
+      } else {
+        if (editing) {
+          formData.append('existingImages', '[]');
+        }
+      }
+
+      // Append new images as files
+      newImages.forEach((image, index) => {
+        formData.append('images', image);
+      });
+
+      // Debug: Log what's being sent
+      console.log('FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(key, value);
+      }
+
       if (editing) {
-        formData.append('existingImages', '[]');
-      }
-    }
-
-    // Append new images as files
-    newImages.forEach((image, index) => {
-      formData.append('images', image);
-    });
-
-    // Debug: Log what's being sent
-    console.log('FormData contents:');
-    for (let [key, value] of formData.entries()) {
-      console.log(key, value);
-    }
-
-    if (editing) {
-      console.log('Updating property:', editing.id); // Debug log
-      await updateHouse({ id: editing.id, formData }).unwrap();
-      showSuccess('Property updated successfully');
-    } else {
-      console.log('Creating new property'); // Debug log
-      await createHouse(formData).unwrap();
-      showSuccess('Property created successfully');
-    }
-    
-    setShowForm(false);
-    setEditing(null);
-    refetchProperties();
-    
-  } catch (error) {
-    console.error('Error saving property:', error);
-    const apiError = error as ApiError;
-    showError(apiError.response?.data?.message || 'Failed to save property');
-  }
-};
-const handleUnitFormSubmit = async (data: UnitFormData) => {
-  if (!selectedProperty) return;
-  
-  try {
-    const formData = new FormData();
-    
-    console.log('Submitting unit data:', data); 
-    
- 
-    formData.append('houseId', selectedProperty.id);
-    
-   
-    const simpleFields = [
-      'name', 'number', 'description', 'floorNumber', 'size', 
-      'bedrooms', 'palour', 'toilet', 'kitchen', 'bathrooms', 
-      'furnished', 'rentAmount', 'depositAmount', 'rentDueDay', 
-      'tenantId', 'status'
-    ];
-
-    simpleFields.forEach(field => {
-      const value = data[field as keyof UnitFormData];
-      if (value !== undefined && value !== null) {
-    
-        if (typeof value === 'boolean') {
-          formData.append(field, value ? 'true' : 'false');
-        } else if (Array.isArray(value)) {
-         
-          formData.append(field, value.join(','));
-        } else {
-          formData.append(field, value.toString());
-        }
+        console.log('Updating property:', editing.id);
+        await updateHouse({ id: editing.id, formData }).unwrap();
+        showSuccess('Property updated successfully');
+        setShowForm(false);
+        setEditing(null);
+        refetchProperties();
       } else {
-     
-        formData.append(field, '');
+        console.log('Creating new property');
+        await createHouse(formData).unwrap();
+        showSuccess('Property created successfully');
+        setShowForm(false);
+        setEditing(null);
+        refetchProperties();
       }
-    });
+      
+    } catch (error) {
+      console.error('Error saving property:', error);
+      const apiError = error as ApiError;
+      
+      // Extract and display the actual error message from backend
+      const errorMessage = apiError.response?.data?.message || 
+                          apiError.message || 
+                          'Failed to save property. Please check all required fields.';
+      
+      showError(errorMessage);
+      
+      // Don't close the form on error - keep it open so user can fix issues
+    }
+  };
 
+  const handleUnitFormSubmit = async (data: UnitFormData) => {
+    if (!selectedProperty) return;
+    
+    try {
+      const formData = new FormData();
+      
+      console.log('Submitting unit data:', data); 
+      
+      formData.append('houseId', selectedProperty.id);
+      
+      const simpleFields = [
+        'name', 'number', 'description', 'floorNumber', 'size', 
+        'bedrooms', 'palour', 'toilet', 'kitchen', 'bathrooms', 
+        'furnished', 'rentAmount', 'depositAmount', 'rentDueDay', 
+        'tenantId', 'status'
+      ];
 
-    const existingImages = data.images.filter(img => 
-      typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
-    );
-    const newImages = data.images.filter(img => img instanceof File);
+      simpleFields.forEach(field => {
+        const value = data[field as keyof UnitFormData];
+        if (value !== undefined && value !== null && value !== '') {
+          if (typeof value === 'boolean') {
+            formData.append(field, value ? 'true' : 'false');
+          } else if (Array.isArray(value)) {
+            formData.append(field, value.join(','));
+          } else {
+            formData.append(field, value.toString());
+          }
+        } else {
+          formData.append(field, '');
+        }
+      });
 
-    console.log('Unit Images - Existing:', existingImages.length, 'New:', newImages.length); // Debug log
+      const existingImages = data.images.filter(img => 
+        typeof img === 'string' || (img && typeof img === 'object' && 'url' in img)
+      );
+      const newImages = data.images.filter(img => img instanceof File);
 
-    if (existingImages.length > 0) {
-      formData.append('existingImages', JSON.stringify(existingImages));
-    } else {
-     
+      console.log('Unit Images - Existing:', existingImages.length, 'New:', newImages.length);
+
+      if (existingImages.length > 0) {
+        formData.append('existingImages', JSON.stringify(existingImages));
+      } else {
+        if (editingUnit) {
+          formData.append('existingImages', '[]');
+        }
+      }
+
+      // Append new images as files
+      newImages.forEach((image, index) => {
+        formData.append('images', image);
+      });
+
+      // Debug: Log what's being sent
+      console.log('Unit FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(key, value);
+      }
+
       if (editingUnit) {
-        formData.append('existingImages', '[]');
+        console.log('Updating unit:', editingUnit.id); 
+        await updateUnit({ id: editingUnit.id, formData }).unwrap();
+        showSuccess('Unit updated successfully');
+        setShowUnitForm(false);
+        setEditingUnit(null);
+        refetchUnits();
+      } else {
+        console.log('Creating new unit');
+        await createUnit({ houseId: selectedProperty.id, formData }).unwrap();
+        showSuccess('Unit created successfully');
+        setShowUnitForm(false);
+        setEditingUnit(null);
+        refetchUnits();
       }
+      
+    } catch (error) {
+      console.error('Error saving unit:', error);
+      const apiError = error as ApiError;
+      
+      // Extract and display the actual error message from backend
+      const errorMessage = apiError.response?.data?.message || 
+                          apiError.message || 
+                          'Failed to save unit. Please check all required fields.';
+      
+      showError(errorMessage);
+      
+      // Don't close the form on error - keep it open so user can fix issues
     }
+  };
 
-    // Append new images as files
-    newImages.forEach((image, index) => {
-      formData.append('images', image);
-    });
-
-    // Debug: Log what's being sent
-    console.log('Unit FormData contents:');
-    for (let [key, value] of formData.entries()) {
-      console.log(key, value);
-    }
-
-    if (editingUnit) {
-      console.log('Updating unit:', editingUnit.id); 
-      await updateUnit({ id: editingUnit.id, formData }).unwrap();
-      showSuccess('Unit updated successfully');
-    } else {
-      console.log('Creating new unit'); // Debug log
-      await createUnit({ houseId: selectedProperty.id, formData }).unwrap();
-      showSuccess('Unit created successfully');
-    }
-    
-    setShowUnitForm(false);
-    setEditingUnit(null);
-    refetchUnits();
-    
-  } catch (error) {
-    console.error('Error saving unit:', error);
-    const apiError = error as ApiError;
-    showError(apiError.response?.data?.message || 'Failed to save unit');
-  }
-};
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-96">
@@ -563,7 +606,7 @@ const handleUnitFormSubmit = async (data: UnitFormData) => {
 
       {showForm && (
         <PropertyForm
-          initial={editing || ""}
+          initial={editing || undefined}
           onSubmit={handleFormSubmit}
           onClose={() => setShowForm(false)}
           loading={isCreating || isUpdating}

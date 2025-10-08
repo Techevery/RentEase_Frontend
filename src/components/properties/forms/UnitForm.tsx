@@ -72,6 +72,24 @@ const UnitForm: React.FC<UnitFormProps> = ({
   const { data: tenantsData } = useGetTenantsQuery({});
   const tenants = tenantsData?.data || [];
 
+  // Check if form is valid for submission
+  const isFormValid = () => {
+    return (
+      form.name.trim() !== '' &&
+      form.number.trim() !== '' &&
+      form.description.trim() !== '' &&
+      form.floorNumber >= 1 &&
+      form.size > 0 &&
+      form.bedrooms >= 1 &&
+      form.toilet >= 1 &&
+      form.bathrooms >= 1 &&
+      form.rentAmount > 0 &&
+      form.depositAmount >= 0 &&
+      (form.rentDueDay >= 1 && form.rentDueDay <= 31) &&
+      form.tenantId !== '' // Tenant is required
+    );
+  };
+
   // Load image previews and set form data
   useEffect(() => {
     const loadImagePreviews = () => {
@@ -96,15 +114,16 @@ const UnitForm: React.FC<UnitFormProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     setFormErrors(prev => ({ ...prev, [name]: '' }));
- if (name === 'tenantId') {
-    const newStatus = value ? 'occupied' as const : 'vacant' as const;
-    setForm(prev => ({
-      ...prev,
-      tenantId: value,
-      status: newStatus
-    }));
-    return;
-  }
+
+    if (name === 'tenantId') {
+      const newStatus = value ? 'occupied' as const : 'vacant' as const;
+      setForm(prev => ({
+        ...prev,
+        tenantId: value,
+        status: newStatus
+      }));
+      return;
+    }
 
     // Handle numeric fields with input sanitization
     const numericFields = ['floorNumber', 'size', 'bedrooms', 'toilet', 'bathrooms', 'rentAmount', 'depositAmount', 'rentDueDay'];
@@ -167,7 +186,8 @@ const UnitForm: React.FC<UnitFormProps> = ({
     if (form.bathrooms <= 0) errors.bathrooms = 'Invalid bathroom count';
     if (form.rentAmount <= 0) errors.rentAmount = 'Invalid rent amount';
     if (form.depositAmount < 0) errors.depositAmount = 'Invalid deposit amount';
-    if (form.rentDueDay < 1 || form.rentDueDay > 31) errors.rentDueDay = 'Invalid due day';
+    if (form.rentDueDay < 1 || form.rentDueDay > 31) errors.rentDueDay = 'Invalid due day (must be 1-31)';
+    if (!form.tenantId) errors.tenantId = 'Tenant selection is required';
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -193,7 +213,7 @@ const UnitForm: React.FC<UnitFormProps> = ({
           depositAmount: Number(form.depositAmount),
           rentDueDay: Number(form.rentDueDay),
           // Auto-set status based on tenant assignment
-            status: form.tenantId ? 'occupied' as const : 'vacant' as const
+          status: form.tenantId ? 'occupied' as const : 'vacant' as const
         };
         
         await onSubmit(submitData);
@@ -212,7 +232,6 @@ const UnitForm: React.FC<UnitFormProps> = ({
     }
   };
 
-  // RETURN THE JSX - This was missing
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -263,12 +282,13 @@ const UnitForm: React.FC<UnitFormProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">Tenant</label>
+            <label className="block text-sm font-medium text-gray-700">Tenant *</label>
             <select 
               name="tenantId" 
               value={form.tenantId} 
               onChange={handleInputChange} 
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className={`w-full border ${formErrors.tenantId ? 'border-red-500' : 'border-gray-300'} rounded px-3 py-2`}
+              required
             >
               <option value="">Select Tenant</option>
               {tenants.map((tenant: any) => (
@@ -277,6 +297,7 @@ const UnitForm: React.FC<UnitFormProps> = ({
                 </option>
               ))}
             </select>
+            {formErrors.tenantId && <p className="mt-1 text-sm text-red-600">{formErrors.tenantId}</p>}
           </div>
 
           {/* Status Display */}
@@ -413,6 +434,21 @@ const UnitForm: React.FC<UnitFormProps> = ({
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700">Toilet *</label>
+            <input 
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              name="toilet" 
+              value={form.toilet} 
+              onChange={handleInputChange} 
+              className={`w-full border ${formErrors.toilet ? 'border-red-500' : 'border-gray-300'} rounded px-3 py-2`}
+              required
+            />
+            {formErrors.toilet && <p className="mt-1 text-sm text-red-600">{formErrors.toilet}</p>}
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-700">Unit Images</label>
             <input 
               type="file" 
@@ -441,7 +477,11 @@ const UnitForm: React.FC<UnitFormProps> = ({
             <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button 
+              type="submit" 
+              disabled={loading || !isFormValid()}
+              title={!isFormValid() ? "Please fill all required fields including tenant selection" : ""}
+            >
               {initialData.id ? 'Update Unit' : 'Create Unit'}
             </Button>
           </div>

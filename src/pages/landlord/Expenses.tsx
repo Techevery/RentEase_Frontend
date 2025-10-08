@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Download, Plus, Trash2, Eye, X, Building } from 'lucide-react';
+import { Search, Filter, Download, Plus, Trash2, Eye, X, Building, RefreshCw } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -40,6 +40,26 @@ interface Expense {
   documentUrl?: string;
   rejectionReason?: string;
   manager?: string;
+}
+
+interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
+interface ApiResponse {
+  success: boolean;
+  data: BackendExpense[];
+  count: number;
+  pagination?: {
+    next?: { page: number; limit: number };
+    prev?: { page: number; limit: number };
+    currentPage?: number;
+    totalPages?: number;
+  };
 }
 
 const transformExpense = (expense: BackendExpense): Expense => ({
@@ -580,9 +600,19 @@ const ExpenseDetailsModal: React.FC<{
 };
 
 const LandlordExpenses: React.FC = () => {
-  const { data, isLoading, isError, refetch } = useGetExpensesQuery({}, {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  
+  // Fetch all expenses by setting a large limit
+  const { data, isLoading, isError, refetch } = useGetExpensesQuery({ 
+    page: 1, 
+    limit: 1000 // Fetch a large number to get all expenses
+  }, {
     refetchOnMountOrArgChange: true,
   });
+  
   const [createExpense, { isLoading: isUploading }] = useCreateExpenseMutation();
   const [updateExpense] = useCreateExpenseMutation();
   const [deleteExpense] = useDeleteExpenseMutation();
@@ -592,8 +622,9 @@ const LandlordExpenses: React.FC = () => {
   const { data: propertiesData } = useGetHousesQuery({});
   const properties = propertiesData?.data || [];
 
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [displayedExpenses, setDisplayedExpenses] = useState<Expense[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [showPropertyFilter, setShowPropertyFilter] = useState(false);
@@ -603,26 +634,77 @@ const LandlordExpenses: React.FC = () => {
   const [detailsExpense, setDetailsExpense] = useState<Expense | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Pagination state for displayed results
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalItems: 0,
+    totalPages: 1
+  });
+
+  // Process expenses data
   useEffect(() => {
-    if (data?.data) {
-      const transformedExpenses = data.data.map(transformExpense);
-      setExpenses(transformedExpenses);
+    if (data) {
+      const apiResponse = data as ApiResponse;
+      const backendExpenses = apiResponse?.data || [];
+      const transformedExpenses = backendExpenses.map(transformExpense);
+      
+      setAllExpenses(transformedExpenses);
       setFilteredExpenses(transformedExpenses);
     }
   }, [data]);
 
-  // Filter expenses when selectedProperty changes
+  // Filter expenses when filters change
   useEffect(() => {
-    if (selectedProperty) {
-      const filtered = expenses.filter(expense => {
-        const property = properties.find((p: { _id: string; }) => p._id === selectedProperty);
-        return property && expense.property === property.name;
-      });
-      setFilteredExpenses(filtered);
-    } else {
-      setFilteredExpenses(expenses);
+    let result = [...allExpenses];
+    
+    // Apply search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(expense => 
+        expense.property.toLowerCase().includes(term) ||
+        expense.description.toLowerCase().includes(term) ||
+        expense.vendor.toLowerCase().includes(term) ||
+        expense.category.toLowerCase().includes(term) ||
+        expense.amount.toString().includes(term)
+      );
     }
-  }, [selectedProperty, expenses, properties]);
+    
+    // Apply property filter
+    if (selectedProperty) {
+      const property = properties.find((p: { _id: string; }) => p._id === selectedProperty);
+      if (property) {
+        result = result.filter(expense => expense.property === property.name);
+      }
+    }
+    
+    // Apply category filter
+    if (selectedCategory !== 'all') {
+      result = result.filter(expense => expense.category === selectedCategory);
+    }
+    
+    // Apply status filter
+    if (selectedStatus !== 'all') {
+      result = result.filter(expense => expense.status.toLowerCase() === selectedStatus);
+    }
+    
+    setFilteredExpenses(result);
+    
+    // Reset to first page when filters change
+    setPagination(prev => ({
+      ...prev,
+      currentPage: 1,
+      totalItems: result.length,
+      totalPages: Math.ceil(result.length / prev.itemsPerPage)
+    }));
+  }, [searchTerm, selectedProperty, selectedCategory, selectedStatus, allExpenses, properties]);
+
+  // Update displayed expenses based on current pagination
+  useEffect(() => {
+    const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    const endIndex = startIndex + pagination.itemsPerPage;
+    setDisplayedExpenses(filteredExpenses.slice(startIndex, endIndex));
+  }, [filteredExpenses, pagination.currentPage, pagination.itemsPerPage]);
 
   const handleExport = () => {
     const csvRows = [
@@ -674,13 +756,22 @@ const LandlordExpenses: React.FC = () => {
     setShowPropertyFilter(false);
   };
 
-  // const handleEdit = (expense: Expense) => {
-  //   setEditing(expense);
-  //   setShowForm(true);
-  // };
-
   const handleDelete = (id: string) => {
     setDeleteId(id);
+  };
+
+  const handleNextPage = () => {
+    setPagination(prev => ({
+      ...prev,
+      currentPage: Math.min(prev.currentPage + 1, prev.totalPages)
+    }));
+  };
+
+  const handlePrevPage = () => {
+    setPagination(prev => ({
+      ...prev,
+      currentPage: Math.max(1, prev.currentPage - 1)
+    }));
   };
 
   const confirmDelete = async () => {
@@ -728,21 +819,21 @@ const LandlordExpenses: React.FC = () => {
   };
 
   const handleReject = async (id: string) => {
-    const reason = window.prompt('Please enter rejection reason:');
-    if (!reason) return;
-
     try {
       setLoading(true);
-      await rejectExpense({ id, rejectionReason: reason }).unwrap();
+      await rejectExpense({ id }).unwrap();
       refetch();
     } catch (error) {
       console.error('Rejection failed:', error);
-      alert('Failed to reject expense. Please try again.');
     } finally {
       setLoading(false);
       setDetailsExpense(null);
     }
   };
+
+  // Get unique categories and statuses for filter dropdowns
+  const categories = ['maintenance', 'utilities', 'taxes', 'insurance', 'other'];
+  const statusOptions = ['all', 'pending', 'approved', 'rejected'];
 
   if (isLoading) {
     return <div className="p-8 text-center">Loading expenses...</div>;
@@ -760,6 +851,14 @@ const LandlordExpenses: React.FC = () => {
           <p className="text-gray-600">Track and manage property expenses</p>
         </div>
         <div className="flex space-x-3">
+          <Button 
+            variant="outline" 
+            icon={<RefreshCw size={20} />}
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            Refresh
+          </Button>
           <Button variant="outline" icon={<Download size={20} />} onClick={handleExport}>
             Export
           </Button>
@@ -787,20 +886,35 @@ const LandlordExpenses: React.FC = () => {
                 id="search"
                 name="search"
                 type="text"
-                placeholder="Search expenses..."
-                value=""
-                onChange={() => {}}
+                placeholder="Search expenses by property, description, vendor, amount..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 icon={<Search size={18} />}
               />
             </div>
             <div className="flex space-x-3">
-              <select className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                <option>All Categories</option>
-                <option>Maintenance</option>
-                <option>Utilities</option>
-                <option>Taxes</option>
-                <option>Insurance</option>
-                <option>Other</option>
+              <select 
+                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                <option value="all">All Categories</option>
+                {categories.map(category => (
+                  <option key={category} value={category}>
+                    {category.charAt(0).toUpperCase() + category.slice(1)}
+                  </option>
+                ))}
+              </select>
+              <select 
+                className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+              >
+                {statusOptions.map(status => (
+                  <option key={status} value={status}>
+                    {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </option>
+                ))}
               </select>
               <Button variant="outline" icon={<Filter size={18} />}>
                 More Filters
@@ -839,7 +953,7 @@ const LandlordExpenses: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredExpenses.map((expense) => (
+                {displayedExpenses.map((expense) => (
                   <tr key={expense.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(expense.date).toLocaleDateString()}
@@ -876,11 +990,6 @@ const LandlordExpenses: React.FC = () => {
                           <Eye size={16} />
                         </Button>
                       </span>
-                      {/* <span title="Edit">
-                        <Button variant="outline" onClick={() => handleEdit(expense)}>
-                          <Edit2 size={16} />
-                        </Button>
-                      </span> */}
                       <span title="Delete">
                         <Button variant="danger" onClick={() => handleDelete(expense.id)}>
                           <Trash2 size={16} />
@@ -893,16 +1002,36 @@ const LandlordExpenses: React.FC = () => {
             </table>
           </div>
 
+          {displayedExpenses.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              {allExpenses.length === 0 
+                ? 'No expenses found.' 
+                : 'No expenses match your search criteria.'
+              }
+            </div>
+          )}
+
           <div className="mt-6 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Showing {filteredExpenses.length} expenses
+              Showing {displayedExpenses.length} of {filteredExpenses.length} expenses
+              {pagination.totalPages > 1 && ` (Page ${pagination.currentPage} of ${pagination.totalPages})`}
               {selectedProperty && ` for ${properties.find((p: { _id: string; }) => p._id === selectedProperty)?.name}`}
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" size="sm" disabled>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handlePrevPage}
+                disabled={pagination.currentPage === 1 || isLoading}
+              >
                 Previous
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleNextPage}
+                disabled={pagination.currentPage === pagination.totalPages || isLoading}
+              >
                 Next
               </Button>
             </div>

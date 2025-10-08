@@ -335,7 +335,11 @@ const PaymentDetailsModal: React.FC<{
 
 const LandlordPayments: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const { data, isLoading, isError, refetch } = useGetPaymentsQuery({ page: currentPage, limit: 10 }, {
+  // Fetch all payments by setting a large limit or fetching without pagination
+  const { data, isLoading, isError, refetch } = useGetPaymentsQuery({ 
+    page: 1, 
+    limit: 1000 // Fetch a large number to get all payments
+  }, {
     pollingInterval: 60000 
   });
   const [approvePayment, { isLoading: isApproving }] = useApprovePaymentMutation();
@@ -343,20 +347,22 @@ const LandlordPayments: React.FC = () => {
 
   const [detailsPayment, setDetailsPayment] = useState<Payment | null>(null);
   const [tenantPropertyPayments, setTenantPropertyPayments] = useState<{tenant: string; property: string} | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
   const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    currentPage: 1,
-    totalPages: 1,
-    totalCount: 0,
-    hasNext: false,
-    hasPrev: false
-  });
+  const [displayedPayments, setDisplayedPayments] = useState<Payment[]>([]);
   
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProperty, setSelectedProperty] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+
+  // Pagination state for displayed results
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    itemsPerPage: 10,
+    totalItems: 0,
+    totalPages: 1
+  });
 
   useEffect(() => {
     if (data) {
@@ -364,35 +370,14 @@ const LandlordPayments: React.FC = () => {
       const backendPayments = apiResponse?.data || [];
       const transformedPayments = backendPayments.map(transformPayment);
       
-      setPayments(transformedPayments);
+      setAllPayments(transformedPayments);
       setFilteredPayments(transformedPayments);
-      
-      // Set pagination info
-      if (apiResponse.pagination) {
-        const paginationData = apiResponse.pagination;
-        setPagination({
-          currentPage: paginationData.currentPage || currentPage,
-          totalPages: paginationData.totalPages || Math.ceil(apiResponse.count / 10),
-          totalCount: apiResponse.count || 0,
-          hasNext: !!paginationData.next,
-          hasPrev: !!paginationData.prev
-        });
-      } else {
-        // Fallback if pagination data is not available
-        setPagination({
-          currentPage: currentPage,
-          totalPages: Math.ceil(apiResponse.count / 10),
-          totalCount: apiResponse.count || 0,
-          hasNext: (currentPage * 10) < (apiResponse.count || 0),
-          hasPrev: currentPage > 1
-        });
-      }
     }
-  }, [data, currentPage]);
+  }, [data]);
 
   // Apply filters whenever search term, property, status, or payments change
   useEffect(() => {
-    let result = [...payments];
+    let result = [...allPayments];
     
     // Apply search filter
     if (searchTerm) {
@@ -418,12 +403,27 @@ const LandlordPayments: React.FC = () => {
     }
     
     setFilteredPayments(result);
-  }, [searchTerm, selectedProperty, selectedStatus, payments]);
+    
+    // Reset to first page when filters change
+    setPagination(prev => ({
+      ...prev,
+      currentPage: 1,
+      totalItems: result.length,
+      totalPages: Math.ceil(result.length / prev.itemsPerPage)
+    }));
+  }, [searchTerm, selectedProperty, selectedStatus, allPayments]);
+
+  // Update displayed payments based on current pagination
+  useEffect(() => {
+    const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
+    const endIndex = startIndex + pagination.itemsPerPage;
+    setDisplayedPayments(filteredPayments.slice(startIndex, endIndex));
+  }, [filteredPayments, pagination.currentPage, pagination.itemsPerPage]);
 
   const handleApprove = async (id: string) => {
     try {
       await approvePayment(id);
-      setPayments(prevPayments => 
+      setAllPayments(prevPayments => 
         prevPayments.map(p => 
           p.id === id 
             ? { ...p, approvalStatus: 'approved', status: 'approved' } 
@@ -440,7 +440,7 @@ const LandlordPayments: React.FC = () => {
   const handleReject = async (id: string) => {
     try {
       await rejectPayment({ id });
-      setPayments(prevPayments => 
+      setAllPayments(prevPayments => 
         prevPayments.map(p => 
           p.id === id 
             ? { ...p, approvalStatus: 'rejected', status: 'rejected' } 
@@ -487,15 +487,21 @@ const LandlordPayments: React.FC = () => {
   };
 
   const handleNextPage = () => {
-    setCurrentPage(prev => prev + 1);
+    setPagination(prev => ({
+      ...prev,
+      currentPage: Math.min(prev.currentPage + 1, prev.totalPages)
+    }));
   };
 
   const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(1, prev - 1));
+    setPagination(prev => ({
+      ...prev,
+      currentPage: Math.max(1, prev.currentPage - 1)
+    }));
   };
 
   // Get unique properties and statuses for filter dropdowns
-  const uniqueProperties = [...new Set(payments.map(p => p.property))].filter(Boolean);
+  const uniqueProperties = [...new Set(allPayments.map(p => p.property))].filter(Boolean);
   const statusOptions = ['pending', 'approved', 'rejected'];
 
   if (isLoading) {
@@ -523,7 +529,6 @@ const LandlordPayments: React.FC = () => {
               <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
             </svg>} 
             onClick={() => {
-              setCurrentPage(1);
               refetch();
             }}
             disabled={isLoading}
@@ -604,7 +609,7 @@ const LandlordPayments: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments.map((payment) => (
+                {displayedPayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {payment.tenant}
@@ -681,7 +686,7 @@ const LandlordPayments: React.FC = () => {
             </table>
           </div>
 
-          {filteredPayments.length === 0 && (
+          {displayedPayments.length === 0 && (
             <div className="text-center py-8 text-gray-500">
               No payments found matching your criteria.
             </div>
@@ -689,7 +694,7 @@ const LandlordPayments: React.FC = () => {
 
           <div className="mt-6 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Showing {filteredPayments.length} of {pagination.totalCount} payments
+              Showing {displayedPayments.length} of {filteredPayments.length} payments
               {pagination.totalPages > 1 && ` (Page ${pagination.currentPage} of ${pagination.totalPages})`}
             </div>
             <div className="flex space-x-2">
@@ -697,7 +702,7 @@ const LandlordPayments: React.FC = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={handlePrevPage}
-                disabled={!pagination.hasPrev || isLoading}
+                disabled={pagination.currentPage === 1 || isLoading}
               >
                 Previous
               </Button>
@@ -705,7 +710,7 @@ const LandlordPayments: React.FC = () => {
                 variant="outline" 
                 size="sm"
                 onClick={handleNextPage}
-                disabled={!pagination.hasNext || isLoading}
+                disabled={pagination.currentPage === pagination.totalPages || isLoading}
               >
                 Next
               </Button>
@@ -725,7 +730,7 @@ const LandlordPayments: React.FC = () => {
 
       {tenantPropertyPayments && (
         <TenantPropertyPaymentsModal
-          payments={payments}
+          payments={allPayments}
           tenantName={tenantPropertyPayments.tenant}
           propertyName={tenantPropertyPayments.property}
           onClose={() => setTenantPropertyPayments(null)}

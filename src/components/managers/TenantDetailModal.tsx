@@ -66,7 +66,8 @@ interface MonthlyBreakdownData {
   [key: string]: { 
     count: number; 
     totalAmount: number; 
-    payments: Payment[] 
+    payments: Payment[]
+    status: 'approved' | 'pending' | 'rejected' | string;
   };
 }
 
@@ -268,11 +269,11 @@ const TenantDetailsModal: React.FC<TenantModalProps> = ({ open, onClose, tenantD
               }}
             >
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{summary.totalPayments}</Typography><Typography variant="body2">Total Payments</Typography></Paper>
-              <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.approved.amount)}</Typography><Typography variant="body2">Total Amount</Typography></Paper>
+              <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.totalAmount)}</Typography><Typography variant="body2">Total Amount</Typography></Paper>
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="success.main">{summary.approved.count}</Typography><Typography variant="body2">Approved</Typography></Paper>
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="warning.main">{summary.pending.count}</Typography><Typography variant="body2">Pending</Typography></Paper>
               <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="error.main">{summary.rejected.count}</Typography><Typography variant="body2">Rejected</Typography></Paper>
-              {/* <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.averagePayment)}</Typography><Typography variant="body2">Average Payment</Typography></Paper> */}
+              <Paper variant="outlined" sx={{ p: 2, minWidth: '120px' }}><Typography variant="h6" color="primary">{formatCurrency(summary.averagePayment)}</Typography><Typography variant="body2">Average Payment</Typography></Paper>
             </Box>
           ) : <Typography>No summary data available.</Typography>}
         </TabPanel>
@@ -304,17 +305,57 @@ const TenantDetailsModal: React.FC<TenantModalProps> = ({ open, onClose, tenantD
           <Box sx={{ overflowX: 'auto' }}>
             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, minWidth: { xs: '500px', sm: 'auto' } }}>
               <Table size="small" stickyHeader>
-                <TableHead><TableRow><TableCell>Month</TableCell><TableCell align="right">Payments</TableCell><TableCell align="right">Total Amount</TableCell></TableRow></TableHead>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Month</TableCell>
+                    <TableCell align="right">Payments</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Total Amount</TableCell>
+                  </TableRow>
+                </TableHead>
                 <TableBody>
                   {monthlyBreakdown && Object.keys(monthlyBreakdown).length > 0 ? (
-                    Object.entries(monthlyBreakdown).map(([month, data]) => (
-                      <TableRow key={month}>
-                        <TableCell>{month}</TableCell>
-                        <TableCell align="right">{data.count}</TableCell>
-                        <TableCell align="right">{formatCurrency(data.totalAmount)}</TableCell>
-                      </TableRow>
-                    ))
-                  ) : <TableRow><TableCell colSpan={3} align="center">No monthly data available.</TableCell></TableRow>}
+                    Object.entries(monthlyBreakdown).map(([month, data]) => {
+                      // Calculate overall status based on payments if status is not provided
+                      const getOverallStatus = () => {
+                        // If status is already provided, use it
+                        if (data.status && ['approved', 'pending', 'rejected'].includes(data.status)) {
+                          return data.status;
+                        }
+                        
+                        // Otherwise calculate from payments
+                        if (!data.payments || data.payments.length === 0) return 'No payments';
+                        
+                        const hasApproved = data.payments.some(p => p.status === 'approved');
+                        const hasPending = data.payments.some(p => p.status === 'pending');
+                        const hasRejected = data.payments.some(p => p.status === 'rejected');
+                        
+                        if (hasApproved) return 'approved';
+                        if (hasPending) return 'pending';
+                        if (hasRejected) return 'rejected';
+                        return 'unknown';
+                      };
+                      
+                      const overallStatus = getOverallStatus();
+                      
+                      return (
+                        <TableRow key={month}>
+                          <TableCell>{month}</TableCell>
+                          <TableCell align="right">{data.count}</TableCell>
+                          <TableCell>
+                            <Typography 
+                              variant="caption" 
+                              color={getStatusColor(overallStatus)}
+                              sx={{ textTransform: 'capitalize', fontWeight: 'bold' }}
+                            >
+                              {overallStatus}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="right">{formatCurrency(data.totalAmount)}</TableCell>
+                        </TableRow>
+                      );
+                    })
+                  ) : <TableRow><TableCell colSpan={4} align="center">No monthly data available.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </TableContainer>
