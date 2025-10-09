@@ -218,281 +218,280 @@ const UploadPaymentModal: React.FC<{
         ...prev,
         flatId: value,
       }));
-    } else if (name === 'receipt') {
-      const fileInput = e.target as HTMLInputElement;
-      const file = fileInput.files?.[0];
-      if (file) {
-        setForm(prev => ({ ...prev, receipt: file }));
-        const url = URL.createObjectURL(file);
-        setReceiptUrl(url);
-      }
+    } else if (name === 'receipt' && target instanceof HTMLInputElement && target.files && target.files[0]) {
+      const file = target.files[0];
+      setForm((prev) => ({
+        ...prev,
+        receipt: file,
+      }));
+      setReceiptUrl(URL.createObjectURL(file));
     } else {
-      setForm(prev => ({ ...prev, [name]: value }));
+      setForm((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
     }
   };
 
   const handlePaymentTypeChange = (type: string, checked: boolean) => {
-    setForm(prev => ({
-      ...prev,
-      paymentTypes: checked 
-        ? [...prev.paymentTypes, type]
-        : prev.paymentTypes.filter(t => t !== type)
-    }));
+    setForm(prev => {
+      if (checked) {
+        // Add the payment type if checked
+        return {
+          ...prev,
+          paymentTypes: [...prev.paymentTypes, type]
+        };
+      } else {
+        // Remove the payment type if unchecked, but ensure at least one remains
+        const filteredTypes = prev.paymentTypes.filter(t => t !== type);
+        return {
+          ...prev,
+          paymentTypes: filteredTypes.length > 0 ? filteredTypes : ['Rent']
+        };
+      }
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     const formData = new FormData();
-    formData.append('tenantId', form.tenantId);
-    formData.append('flatId', form.flatId);
-    formData.append('amount', form.amount);
-    formData.append('paymentDate', form.paymentDate);
-    formData.append('paymentMethod', form.paymentMethod);
-    formData.append('description', form.description);
-    formData.append('paymentTypes', JSON.stringify(form.paymentTypes));
-    if (form.receipt) {
-      formData.append('receipt', form.receipt);
-    }
-    onSubmit(formData);
-  };
-
-  const resetForm = () => {
-    setForm({
-      tenantId: '',
-      flatId: '',
-      amount: '',
-      paymentDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date().toISOString().split('T')[0],
-      paymentMethod: 'Bank Transfer',
-      description: '',
-      receipt: null,
-      propertyId: '',
-      paymentTypes: ['Rent'],
+    
+    // Append all form fields
+    Object.entries(form).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        if (key === 'receipt' && value instanceof File) {
+          formData.append('receipt', value);
+        } else if (key === 'paymentTypes' && Array.isArray(value)) {
+          // Append each payment type as a separate field
+          value.forEach(type => {
+            formData.append('paymentTypes', type);
+          });
+        } else {
+          formData.append(key, value.toString());
+        }
+      }
     });
-    setReceiptUrl('');
-  };
-
-  const handleClose = () => {
-    resetForm();
+    
+    onSubmit(formData);
     onClose();
   };
 
   if (!open) return null;
+  
+  const selectedTenant = tenants.find((t: Tenant) => t._id === form.tenantId);
+  const selectedUnit = units.find((u: Unit) => u._id === form.flatId);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Upload Payment Record</h2>
-            <button
-              className="text-gray-400 hover:text-gray-600"
-              onClick={handleClose}
-            >
-              <X size={24} />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Property *
-                </label>
-                <select
-                  name="propertyId"
-                  value={form.propertyId}
-                  onChange={handleChange}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Select Property</option>
-                  {houses.map((house: Property) => (
-                    <option key={house._id} value={house._id}>
-                      {house.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit *
-                </label>
-                <select
-                  name="flatId"
-                  value={form.flatId}
-                  onChange={handleChange}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                  disabled={!form.propertyId}
-                >
-                  <option value="">Select Unit</option>
-                  {units.map((unit: Unit) => (
-                    <option key={unit._id} value={unit._id}>
-                      {unit.number}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
+      <div className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] flex flex-col">
+        <button
+          className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+          onClick={onClose}
+        >
+          <X size={20} />
+        </button>
+        <h2 className="text-xl font-bold mb-4 text-center mt-4">Upload Payment</h2>
+        <form className="flex-1 overflow-y-auto p-6 space-y-4" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Tenant
-              </label>
-              <select
-                name="tenantId"
-                value={form.tenantId}
-                onChange={handleChange}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              <label className="block text-sm mb-1">Property</label>
+              <select 
+                name="propertyId" 
+                value={form.propertyId} 
+                onChange={handleChange} 
+                className="w-full border rounded px-3 py-2" 
                 required
+                disabled={isLoadingProperties || isPropertiesError}
               >
-                <option value="">Select Tenant</option>
-                {tenants.map((tenant: Tenant) => (
-                  <option key={tenant._id} value={tenant._id}>
-                    {tenant.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Amount *
-                </label>
-                <input
-                  type="number"
-                  name="amount"
-                  value={form.amount}
-                  onChange={handleChange}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment Date *
-                </label>
-                <input
-                  type="date"
-                  name="paymentDate"
-                  value={form.paymentDate}
-                  onChange={handleChange}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment Method *
-                </label>
-                <select
-                  name="paymentMethod"
-                  value={form.paymentMethod}
-                  onChange={handleChange}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                >
-                  <option value="Bank Transfer">Bank Transfer</option>
-                  <option value="Cash">Cash</option>
-                  <option value="Cheque">Cheque</option>
-                  <option value="POS">POS</option>
-                  <option value="Online">Online</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <input
-                  type="text"
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Payment description"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Payment Types *
-              </label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {paymentTypeOptions.map((option) => (
-                  <PaymentTypeCheckbox
-                    key={option.value}
-                    type={option.value}
-                    label={option.label}
-                    checked={form.paymentTypes.includes(option.value)}
-                    onChange={handlePaymentTypeChange}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Receipt (Optional)
-              </label>
-              <input
-                type="file"
-                name="receipt"
-                accept="image/*,.pdf"
-                onChange={handleChange}
-                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
-              {receiptUrl && (
-                <div className="mt-2">
-                  <img
-                    src={receiptUrl}
-                    alt="Receipt preview"
-                    className="max-w-full h-auto max-h-32 rounded border"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleClose}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={loading || !form.tenantId || !form.amount || !form.paymentDate}
-              >
-                {loading ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin mr-2" />
-                    Uploading...
-                  </>
+                {isLoadingProperties ? (
+                  <option value="">Loading Properties...</option>
+                ) : isPropertiesError ? (
+                  <option value="">Error loading properties</option>
+                ) : houses.length === 0 ? (
+                  <option value="">No properties available</option>
                 ) : (
                   <>
-                    <Upload size={16} className="mr-2" />
-                    Upload Payment
+                    <option value="">Select Property</option>
+                    {houses.map((house) => (
+                      <option key={house._id} value={house._id}>
+                        {house.name}
+                      </option>
+                    ))}
                   </>
                 )}
-              </Button>
+              </select>
             </div>
-          </form>
-        </div>
+            
+            <div>
+              <label className="block text-sm mb-1">Unit</label>
+              <select 
+                name="flatId" 
+                value={form.flatId} 
+                onChange={handleChange} 
+                className="w-full border rounded px-3 py-2" 
+                required
+                disabled={!form.propertyId || isLoadingProperties}
+              >
+                {isLoadingProperties ? (
+                  <option value="">Loading Units...</option>
+                ) : (
+                  <>
+                    <option value="">Select Unit</option>
+                    {units.map((unit: Unit) => (
+                      <option key={unit._id} value={unit._id}>
+                        {unit.number} 
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm mb-1">Tenant</label>
+              <input
+                name="tenant"
+                placeholder="Tenant"
+                value={selectedTenant?.name || 'No tenant assigned to this unit'}
+                className="w-full border rounded px-3 py-2 bg-gray-100"
+                readOnly
+              />
+              <input
+                type="hidden"
+                name="tenantId"
+                value={form.tenantId}
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm mb-1">Amount</label>
+              <input
+                name="amount"
+                placeholder="Amount"
+                type="number"
+                value={form.amount}
+                onChange={handleChange}
+                className="w-full border rounded px-3 py-2"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm mb-1">Unit Number</label>
+              <input
+                name="unit"
+                placeholder="Unit"
+                value={selectedUnit?.number || ''}
+                className="w-full border rounded px-3 py-2 bg-gray-100"
+                readOnly
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm mb-1">Payment Date</label>
+              <input
+                name="paymentDate"
+                type="date"
+                value={form.paymentDate}
+                onChange={handleChange}
+                className="w-full border rounded px-3 py-2"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm mb-1">Due Date</label>
+              <input
+                name="dueDate"
+                type="date"
+                value={form.dueDate}
+                onChange={handleChange}
+                className="w-full border rounded px-3 py-2"
+                required
+              />
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm mb-1">Payment Method</label>
+            <select
+              name="paymentMethod"
+              value={form.paymentMethod}
+              onChange={handleChange}
+              className="w-full border rounded px-3 py-2"
+              required
+            >
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Credit Card">Credit Card</option>
+              <option value="Cash">Cash</option>
+            </select>
+          </div>
+          
+          <div>
+            <label className="block text-sm mb-1">Payment For</label>
+            <div className="grid grid-cols-2 gap-2 p-2 border rounded">
+              {paymentTypeOptions.map((option) => (
+                <PaymentTypeCheckbox
+                  key={option.value}
+                  type={option.value}
+                  label={option.label}
+                  checked={form.paymentTypes.includes(option.value)}
+                  onChange={handlePaymentTypeChange}
+                />
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <label className="block text-sm mb-1">Description</label>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              placeholder="Description"
+              className="w-full border rounded px-3 py-2"
+              required
+              rows={3}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm mb-1">Upload Receipt</label>
+            <input
+              name="receipt"
+              type="file"
+              accept="image/*"
+              onChange={handleChange}
+              className="w-full"
+              required={form.paymentMethod === 'Bank Transfer'}
+            />
+            {receiptUrl && (
+              <img
+                src={receiptUrl}
+                alt="Receipt Preview"
+                className="mt-2 w-full max-w-xs object-cover border rounded"
+              />
+            )}
+          </div>
+          
+          <div className="flex justify-end space-x-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button 
+              type="submit" 
+              variant="primary" 
+              disabled={loading || isLoadingProperties || !form.tenantId}
+            >
+              {loading ? 'Uploading...' : 'Upload'}
+            </Button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -500,47 +499,71 @@ const UploadPaymentModal: React.FC<{
 
 const ManagerPayments: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  // Fetch all payments by setting a large limit
-  const { data, isLoading, isError, refetch } = useGetPaymentsQuery({ 
-    page: 1, 
-    limit: 1000 // Fetch a large number to get all payments
-  }, {
-    pollingInterval: 60000 
-  });
-  const [createPayment, { isLoading: isCreating }] = useCreatePaymentMutation();
-
-  const [uploadModalOpen, setUploadModalOpen] = useState(false);
-  const [allPayments, setAllPayments] = useState<Payment[]>([]);
-  const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
-  const [displayedPayments, setDisplayedPayments] = useState<Payment[]>([]);
-  
-  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedProperty, setSelectedProperty] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
-
-  // Pagination state for displayed results
-  const [pagination, setPagination] = useState({
+  
+  const { 
+    data: paymentsData, 
+    isLoading, 
+    isError, 
+    refetch 
+  } = useGetPaymentsQuery({ 
+    page: currentPage, 
+    limit: 10 
+  }, {
+    pollingInterval: 60000 
+  });
+  
+  const [createPayment, { isLoading: isUploading }] = useCreatePaymentMutation();
+  const [showUpload, setShowUpload] = useState(false);
+  const [pagination, setPagination] = useState<PaginationInfo>({
     currentPage: 1,
-    itemsPerPage: 10,
-    totalItems: 0,
-    totalPages: 1
+    totalPages: 1,
+    totalCount: 0,
+    hasNext: false,
+    hasPrev: false
   });
 
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [filteredPayments, setFilteredPayments] = useState<Payment[]>([]);
+
+  // Process payments data and pagination
   useEffect(() => {
-    if (data) {
-      const apiResponse = data as ApiResponse;
+    if (paymentsData) {
+      const apiResponse = paymentsData as ApiResponse;
       const backendPayments = apiResponse?.data || [];
       const transformedPayments = backendPayments.map(transformPayment);
       
-      setAllPayments(transformedPayments);
+      setPayments(transformedPayments);
       setFilteredPayments(transformedPayments);
+      
+      // Set pagination info
+      if (apiResponse.pagination) {
+        const paginationData = apiResponse.pagination;
+        setPagination({
+          currentPage: paginationData.currentPage || currentPage,
+          totalPages: paginationData.totalPages || Math.ceil(apiResponse.count / 10),
+          totalCount: apiResponse.count || 0,
+          hasNext: !!paginationData.next,
+          hasPrev: !!paginationData.prev
+        });
+      } else {
+        // Fallback if pagination data is not available
+        setPagination({
+          currentPage: currentPage,
+          totalPages: Math.ceil(apiResponse.count / 10),
+          totalCount: apiResponse.count || 0,
+          hasNext: (currentPage * 10) < (apiResponse.count || 0),
+          hasPrev: currentPage > 1
+        });
+      }
     }
-  }, [data]);
+  }, [paymentsData, currentPage]);
 
   // Apply filters whenever search term, property, status, or payments change
   useEffect(() => {
-    let result = [...allPayments];
+    let result = [...payments];
     
     // Apply search filter
     if (searchTerm) {
@@ -550,7 +573,8 @@ const ManagerPayments: React.FC = () => {
         payment.property.toLowerCase().includes(term) ||
         payment.unit.toLowerCase().includes(term) ||
         payment.method.toLowerCase().includes(term) ||
-        payment.amount.toString().includes(term)
+        payment.amount.toString().includes(term) ||
+        payment.paymentTypes.some(type => type.toLowerCase().includes(term))
       );
     }
     
@@ -565,32 +589,7 @@ const ManagerPayments: React.FC = () => {
     }
     
     setFilteredPayments(result);
-    
-    // Reset to first page when filters change
-    setPagination(prev => ({
-      ...prev,
-      currentPage: 1,
-      totalItems: result.length,
-      totalPages: Math.ceil(result.length / prev.itemsPerPage)
-    }));
-  }, [searchTerm, selectedProperty, selectedStatus, allPayments]);
-
-  // Update displayed payments based on current pagination
-  useEffect(() => {
-    const startIndex = (pagination.currentPage - 1) * pagination.itemsPerPage;
-    const endIndex = startIndex + pagination.itemsPerPage;
-    setDisplayedPayments(filteredPayments.slice(startIndex, endIndex));
-  }, [filteredPayments, pagination.currentPage, pagination.itemsPerPage]);
-
-  const handleUploadPayment = async (formData: FormData) => {
-    try {
-      await createPayment(formData).unwrap();
-      setUploadModalOpen(false);
-      await refetch();
-    } catch (error) {
-      console.error('Upload failed:', error);
-    }
-  };
+  }, [searchTerm, selectedProperty, selectedStatus, payments]);
 
   const handleExport = () => {
     const csvRows = [
@@ -608,38 +607,43 @@ const ManagerPayments: React.FC = () => {
         ].join(',')
       ),
     ];
+    
     const csvContent = 'data:text/csv;charset=utf-8,' + csvRows.join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
     link.setAttribute('download', 'payments.csv');
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
   };
 
   const handleNextPage = () => {
-    setPagination(prev => ({
-      ...prev,
-      currentPage: Math.min(prev.currentPage + 1, prev.totalPages)
-    }));
+    setCurrentPage(prev => prev + 1);
   };
 
   const handlePrevPage = () => {
-    setPagination(prev => ({
-      ...prev,
-      currentPage: Math.max(1, prev.currentPage - 1)
-    }));
+    setCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  const handleUploadPayment = async (formData: FormData) => {
+    try {
+      await createPayment(formData).unwrap();
+      // Refresh the payments list after successful upload
+      refetch();
+      // Reset to first page to see the new payment
+      setCurrentPage(1);
+    } catch (error) {
+      console.error('Failed to upload payment:', error);
+    }
   };
 
   // Get unique properties and statuses for filter dropdowns
-  const uniqueProperties = [...new Set(allPayments.map(p => p.property))].filter(Boolean);
+  const uniqueProperties = [...new Set(payments.map(p => p.property))].filter(Boolean);
   const statusOptions = ['pending', 'approved', 'rejected'];
 
   if (isLoading) {
     return <div className="p-8 text-center">Loading payments...</div>;
   }
-
+  
   if (isError) {
     return <div className="p-8 text-center text-red-600">Failed to load payments.</div>;
   }
@@ -648,24 +652,29 @@ const ManagerPayments: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
-          <p className="text-gray-600">Manage and track property payments</p>
+          <h1 className="text-2xl font-bold text-gray-900">Payment Management</h1>
+          <p className="text-gray-600">Upload and track tenant payments</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" icon={<Download size={20} />} onClick={handleExport}>
+          <Button 
+            variant="outline" 
+            icon={<Download size={20} />} 
+            onClick={handleExport}
+          >
             Export
           </Button>
-          <Button 
-            variant="primary" 
-            icon={<Upload size={20} />} 
-            onClick={() => setUploadModalOpen(true)}
+          <Button
+            variant="primary"
+            icon={<Upload size={20} />}
+            onClick={() => setShowUpload(true)}
           >
             Upload Payment
           </Button>
-          <Button 
-            variant="outline" 
-            icon={<RefreshCw size={20} />} 
+          <Button
+            variant="outline"
+            icon={<RefreshCw size={20} />}
             onClick={() => {
+              setCurrentPage(1);
               refetch();
             }}
             disabled={isLoading}
@@ -683,7 +692,7 @@ const ManagerPayments: React.FC = () => {
                 id="search"
                 name="search"
                 type="text"
-                placeholder="Search payments by tenant, property, unit..."
+                placeholder="Search payments by tenant, property, unit, amount..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 icon={<Search size={18} />}
@@ -712,6 +721,9 @@ const ManagerPayments: React.FC = () => {
                   </option>
                 ))}
               </select>
+              <Button variant="outline" icon={<Filter size={18} />}>
+                More Filters
+              </Button>
             </div>
           </div>
 
@@ -738,12 +750,12 @@ const ManagerPayments: React.FC = () => {
                     Method
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Payment Types
+                    Payment For
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {displayedPayments.map((payment) => (
+                {filteredPayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {payment.tenant}
@@ -777,10 +789,7 @@ const ManagerPayments: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <div className="flex items-center">
-                        <CreditCard size={16} className="mr-2" />
-                        {payment.paymentTypes.join(', ')}
-                      </div>
+                      {payment.paymentTypes.join(', ')}
                     </td>
                   </tr>
                 ))}
@@ -788,15 +797,18 @@ const ManagerPayments: React.FC = () => {
             </table>
           </div>
 
-          {displayedPayments.length === 0 && (
+          {filteredPayments.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              No payments found matching your criteria.
+              {payments.length === 0 
+                ? 'No payments found.' 
+                : 'No payments match your search criteria.'
+              }
             </div>
           )}
 
           <div className="mt-6 flex items-center justify-between">
             <div className="text-sm text-gray-500">
-              Showing {displayedPayments.length} of {filteredPayments.length} payments
+              Showing {filteredPayments.length} of {pagination.totalCount} payments
               {pagination.totalPages > 1 && ` (Page ${pagination.currentPage} of ${pagination.totalPages})`}
             </div>
             <div className="flex space-x-2">
@@ -804,7 +816,7 @@ const ManagerPayments: React.FC = () => {
                 variant="outline" 
                 size="sm" 
                 onClick={handlePrevPage}
-                disabled={pagination.currentPage === 1 || isLoading}
+                disabled={!pagination.hasPrev || isLoading}
               >
                 Previous
               </Button>
@@ -812,7 +824,7 @@ const ManagerPayments: React.FC = () => {
                 variant="outline" 
                 size="sm"
                 onClick={handleNextPage}
-                disabled={pagination.currentPage === pagination.totalPages || isLoading}
+                disabled={!pagination.hasNext || isLoading}
               >
                 Next
               </Button>
@@ -822,10 +834,10 @@ const ManagerPayments: React.FC = () => {
       </Card>
 
       <UploadPaymentModal
-        open={uploadModalOpen}
-        onClose={() => setUploadModalOpen(false)}
+        open={showUpload}
+        onClose={() => setShowUpload(false)}
         onSubmit={handleUploadPayment}
-        loading={isCreating}
+        loading={isUploading}
       />
     </div>
   );
