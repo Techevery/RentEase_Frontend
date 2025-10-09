@@ -771,8 +771,8 @@ const ManagerExpenses: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          expense.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                          expense.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                          expense.status === 'Approved' ? 'bg-green-100 text-green-800' :
+  expense.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                         }`}>
                           {expense.status.charAt(0) + expense.status.slice(1).toLowerCase()}
                         </span>

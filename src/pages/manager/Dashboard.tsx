@@ -15,6 +15,8 @@ const ManagerDashboard: React.FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
   const { data: response, isLoading, isError } = useGetManagerDashboardQuery();
 
+  console.log({ response });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -49,6 +51,8 @@ const ManagerDashboard: React.FC = () => {
     recentActivity = { payments: [], expenses: [] } 
   } = data || {};
 
+  console.log({expenseStats})
+    console.log({paymentStats})
   const stats = [
     {
       id: 1,
