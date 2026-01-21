@@ -120,7 +120,7 @@ if (isNaN(phoneNumber)) {
             <Building size={48} className="text-blue-800" />
           </div>
           <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account detailsss
+            Create your account details
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
             Join RentEase to manage your properties efficiently
